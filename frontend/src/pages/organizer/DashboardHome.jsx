@@ -33,26 +33,34 @@ const DashboardHome = () => {
 
   return (
     <>
-      <h1 className="text-4xl font-bold mb-8 text-center text-blue-300">Dashboard Overview</h1>
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
+          <h1 className="mt-2 text-3xl font-bold text-blue-300 sm:text-4xl">Dashboard Overview</h1>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-blue-100/80">
+          Track current momentum across bookings, revenue, and recent events from one mobile-safe dashboard.
+        </p>
+      </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <div className="glass p-6 rounded-lg shadow-xl flex flex-col items-center justify-center text-center border border-blue-400/20">
+      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="section-card flex flex-col items-center justify-center rounded-[1.5rem] p-6 text-center">
           <Ticket className="w-10 h-10 text-blue-400 mb-3" />
           <p className="text-3xl font-bold text-white">{stats.totalBookings}</p>
           <p className="text-blue-200">Total Bookings</p>
         </div>
-        <div className="glass p-6 rounded-lg shadow-xl flex flex-col items-center justify-center text-center border border-blue-400/20">
+        <div className="section-card flex flex-col items-center justify-center rounded-[1.5rem] p-6 text-center">
           <DollarSign className="w-10 h-10 text-green-400 mb-3" />
           <p className="text-3xl font-bold text-white">₹{stats.totalRevenue}</p>
           <p className="text-blue-200">Total Revenue</p>
         </div>
-        <div className="glass p-6 rounded-lg shadow-xl flex flex-col items-center justify-center text-center border border-blue-400/20">
+        <div className="section-card flex flex-col items-center justify-center rounded-[1.5rem] p-6 text-center">
           <CalendarPlus className="w-10 h-10 text-purple-400 mb-3" />
           <p className="text-3xl font-bold text-white">{stats.activeShows}</p>
           <p className="text-blue-200">Active Shows</p>
         </div>
-        <div className="glass p-6 rounded-lg shadow-xl flex flex-col items-center justify-center text-center border border-blue-400/20">
+        <div className="section-card flex flex-col items-center justify-center rounded-[1.5rem] p-6 text-center">
           <Users className="w-10 h-10 text-yellow-400 mb-3" />
           <p className="text-3xl font-bold text-white">{stats.totalUsers}</p>
           <p className="text-blue-200">Total Users</p>
@@ -60,10 +68,10 @@ const DashboardHome = () => {
       </div>
 
       {/* Events Section */}
-      <h2 className="text-3xl font-bold mb-6 text-blue-300">Your Events</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <h2 className="mb-6 text-2xl font-bold text-blue-300 sm:text-3xl">Your Events</h2>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {events.map((event) => (
-          <div key={event.id} className="glass rounded-lg shadow-xl overflow-hidden border border-blue-400/20">
+          <div key={event.id} className="section-card overflow-hidden rounded-[1.5rem]">
             <img src={event.banner} alt={event.title} className="w-full h-48 object-cover" />
             <div className="p-6">
               <h3 className="text-xl font-bold text-white mb-2">{event.title}</h3>

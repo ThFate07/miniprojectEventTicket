@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { authenticate } from "../middlewares/auth.middleware.js";
-import { bookTicket, checkSeatsAvailability, deleteMyEvent, getBookings, getEventById, getEvents, getEventSeatsAndTimings, getMyBookings, getMyEventById, getMyEvents, postEvent, updateMyEvent , getOrganizerSummary, getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks } from "../controllers/events.controller.js";
+import { authenticate, authenticateOrganizer } from "../middlewares/auth.middleware.js";
+import { bookTicket, checkSeatsAvailability, deleteMyEvent, getBookings, getEventById, getEvents, getEventSeatsAndTimings, getMyBookings, getMyEventById, getMyEvents, postEvent, updateMyEvent , getOrganizerSummary, getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks, validateTicketEntry } from "../controllers/events.controller.js";
 import { geminiChatBot } from "../controllers/gemini.controller.js";
 
 const router = Router();
@@ -22,5 +22,6 @@ router.post('/lock-seat' , authenticate , lockSeat);
 router.post('/unlock-seat' , authenticate , unlockSeat);
 router.get('/seat-locks/:eventId' , authenticate , getSeatLocks);
 router.post('/book-ticket' , authenticate , bookTicket);
+router.post('/validate-ticket-entry' , authenticateOrganizer , validateTicketEntry);
 router.post('/ask' , geminiChatBot)
 export default router;

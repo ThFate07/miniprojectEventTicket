@@ -19,6 +19,8 @@ const eventTypes = ['Hackathon', 'Live Show'];
 const totalSteps = 4;
 const ticketingModes = ['assigned', 'general'];
 
+const getTrimmedImages = (images) => images.map((image) => image.trim()).filter(Boolean);
+
 const AddEvent = () => {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -29,7 +31,7 @@ const AddEvent = () => {
     times: [''],
     date: '',
     banner: '',
-    image: '',
+    images: [''],
     certificate: false,
     personalized: false,
     ticketingMode: ticketingModes[0],
@@ -53,6 +55,31 @@ const AddEvent = () => {
 
   const handleSelectType = (value) => {
     setForm((prev) => ({ ...prev, type: value }));
+  };
+
+  const handleImageChange = (idx, value) => {
+    setForm((prev) => {
+      const images = [...prev.images];
+      images[idx] = value;
+      return { ...prev, images };
+    });
+  };
+
+  const addImageField = () => {
+    setForm((prev) => ({ ...prev, images: [...prev.images, ''] }));
+  };
+
+  const removeImageField = (idx) => {
+    setForm((prev) => {
+      if (prev.images.length === 1) {
+        return { ...prev, images: [''] };
+      }
+
+      return {
+        ...prev,
+        images: prev.images.filter((_, imageIndex) => imageIndex !== idx),
+      };
+    });
   };
 
   const handleTimeChange = (idx, value) => {
@@ -84,8 +111,8 @@ const AddEvent = () => {
         toast.error('Banner image link is required');
         return false;
       }
-      if (!form.image.trim()) {
-        toast.error('Image link is required');
+      if (getTrimmedImages(form.images).length === 0) {
+        toast.error('At least one gallery image link is required');
         return false;
       }
     }
@@ -172,13 +199,16 @@ const AddEvent = () => {
       }));
     }
 
+    const images = getTrimmedImages(form.images);
+
     const payload = {
       title: form.title,
       description: form.description,
       location: form.location,
       eventType: form.type,
       banner: form.banner,
-      image: form.image,
+      image: images[0],
+      images,
       eventDateTime,
       seats,
       seatMap,
@@ -196,12 +226,16 @@ const AddEvent = () => {
   };
 
   return (
-    <div className="px-10 text-white w-[80vw] max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Add Event</h1>
+    <div className="mx-auto w-full max-w-5xl text-white">
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Add Event</h1>
+      </div>
       {/* Improved Progress Bar with Step Indicators */}
       <div className="mb-8">
         {/* Step Indicators */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="overflow-x-auto pb-2">
+          <div className="mb-4 flex min-w-[42rem] items-center justify-between">
           {[
             { label: 'Basic Info', step: 1 },
             { label: 'Schedule & Seats', step: 2 },
@@ -228,6 +262,7 @@ const AddEvent = () => {
               )}
             </React.Fragment>
           ))}
+          </div>
         </div>
         {/* Progress Bar */}
         <div className="text-blue-300 text-sm mt-2 text-right">Step {step} of {totalSteps}</div>
@@ -235,7 +270,7 @@ const AddEvent = () => {
       <form onSubmit={handleSubmit} className="space-y-8 w-full">
         {/* Step 1: Basic Info + Banner */}
         {step === 1 && (
-          <div className="space-y-4 glass py-8 px-16 flex flex-col w-full rounded-2xl">
+          <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <div>
               <label className="block mb-1 font-semibold text-xl">Title</label>
               <Input className="h-10 border-white/30" placeholder="e.g Github Hackathon" name="title" value={form.title} onChange={handleChange} required />
@@ -266,8 +301,36 @@ const AddEvent = () => {
               <Input className="h-10 border-white/30" placeholder="e.g https://..." name="banner" value={form.banner} onChange={handleChange} required />
             </div>
             <div>
-              <label className="block mb-1 font-semibold text-xl">Image Link</label>
-              <Input className="h-10 border-white/30" placeholder="e.g https://..." name="image" value={form.image} onChange={handleChange} required />
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label className="font-semibold text-xl">Gallery Image Links</label>
+                    <p className="text-sm text-blue-200/70">Add all event photos here. The first image is used as the cover photo in listings.</p>
+                  </div>
+                  <Button type="button" variant="secondary" className="self-start bg-blue-700 px-4 hover:bg-blue-800 text-white" onClick={addImageField}>Add Image</Button>
+                </div>
+                <div className="space-y-3">
+                  {form.images.map((image, idx) => (
+                    <div key={idx} className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-blue-100">{idx === 0 ? 'Cover image' : `Gallery image ${idx + 1}`}</span>
+                        {form.images.length > 1 && (
+                          <Button type="button" variant="ghost" onClick={() => removeImageField(idx)} className="h-8 px-3 text-red-300 hover:bg-red-500/10 hover:text-red-200">
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        className="h-10 border-white/20"
+                        placeholder="e.g https://..."
+                        value={image}
+                        onChange={(e) => handleImageChange(idx, e.target.value)}
+                        required={idx === 0}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="flex justify-end">
               <Button type="button" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={next}>Next</Button>
@@ -276,12 +339,12 @@ const AddEvent = () => {
         )}
         {/* Step 2: Schedule, Seating, Cost */}
         {step === 2 && (
-          <div className="space-y-4 glass py-8 px-16 flex flex-col w-full rounded-2xl">
+          <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <label className="block mb-1 font-semibold text-xl">Event Date</label>
             <Input type="date" className="h-10 border-white/30" name="date" value={form.date} onChange={handleChange} required />
             <label className="block mb-1 font-semibold text-xl">Event Timings</label>
             {form.times.map((time, idx) => (
-              <div key={idx} className="flex gap-2 mb-2">
+              <div key={idx} className="mb-2 flex flex-col gap-2 sm:flex-row">
                 <Input type="time" className="h-10 border-white/30" value={time} onChange={e => handleTimeChange(idx, e.target.value)} required />
                 {form.times.length > 1 && (
                   <Button type="button" variant="destructive" onClick={() => removeTime(idx)} className="px-2">Remove</Button>
@@ -319,7 +382,7 @@ const AddEvent = () => {
               </div>
             </div>
             {form.ticketingMode === 'assigned' ? (
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div
                 className={`relative flex flex-col items-center p-6 rounded-xl border-2 transition-all cursor-pointer
                   ${form.seatMode === 'rows-cols' 
@@ -390,7 +453,7 @@ const AddEvent = () => {
             </div>
             ) : null}
             {form.ticketingMode === 'assigned' ? form.seatMode === 'rows-cols' ? (
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
                 <Input name="rows" className="h-10 border-white/30" value={form.rows} onChange={handleChange} type="number" min="1" max="25" placeholder="Rows" required />
                 <Input name="cols" className="h-10 border-white/30" value={form.cols} onChange={handleChange} type="number" min="1" max="25"placeholder="Columns" required />
               </div>
@@ -401,7 +464,7 @@ const AddEvent = () => {
             )}
             <label className="block mb-1 font-semibold text-xl mt-4">Cost of Ticket (₹)</label>
             <Input className="h-10 border-white/30" placeholder="e.g 500" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
-            <div className="flex justify-between">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Button type="button" variant="secondary" className="bg-gray-700 hover:bg-gray-800 text-white" onClick={back}>Back</Button>
               <Button type="button" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={next}>Next</Button>
             </div>
@@ -409,7 +472,7 @@ const AddEvent = () => {
         )}
         {/* Step 3: Options */}
         {step === 3 && (
-          <div className="space-y-4 glass py-8 px-16 flex flex-col w-full rounded-2xl">
+          <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <div className="flex items-center gap-2">
               <Checkbox id="certificate" name="certificate" checked={form.certificate} onCheckedChange={val => handleChange({ target: { name: 'certificate', type: 'checkbox', checked: val } })} />
               <label htmlFor="certificate" className="text-lg">Give certificate for participants</label>
@@ -418,7 +481,7 @@ const AddEvent = () => {
               <Checkbox id="personalized" name="personalized" checked={form.personalized} onCheckedChange={val => handleChange({ target: { name: 'personalized', type: 'checkbox', checked: val } })} />
               <label htmlFor="personalized" className="text-lg">Need a personalized website</label>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Button type="button" variant="secondary" className="bg-gray-700 hover:bg-gray-800 text-white" onClick={back}>Back</Button>
               <Button type="button" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={next}>Next</Button>
             </div>
@@ -426,22 +489,22 @@ const AddEvent = () => {
         )}
         {/* Step 4: Summary & Submit */}
         {step === 4 && (
-          <div className="space-y-4 glass py-8 px-16 flex flex-col w-full rounded-2xl">
+          <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <h2 className="text-2xl font-bold mb-4">Review & Submit</h2>
-            <div className="bg-gray-900 rounded p-4 border border-blue-400">
+            <div className="rounded-xl border border-blue-400 bg-gray-900 p-4 text-sm leading-7 sm:text-base">
               <p><span className="font-semibold">Title:</span> {form.title}</p>
               <p><span className="font-semibold">Description:</span> {form.description}</p>
               <p><span className="font-semibold">Location:</span> {form.location}</p>
               <p><span className="font-semibold">Type:</span> {form.type}</p>
               <p><span className="font-semibold">Banner:</span> {form.banner}</p>
-              <p><span className="font-semibold">Image:</span> {form.image}</p>
+              <p><span className="font-semibold">Gallery Images:</span> {getTrimmedImages(form.images).join(', ')}</p>
               <p><span className="font-semibold">Timings:</span> {form.times.join(', ')}</p>
               <p><span className="font-semibold">Ticketing:</span> {form.ticketingMode === 'general' ? `General Admission (${form.capacity} tickets)` : form.seatMode === 'rows-cols' ? `${form.rows} rows x ${form.cols} columns` : `${form.seats} seats`}</p>
               <p><span className="font-semibold">Ticket Cost:</span> ₹{form.cost}</p>
               <p><span className="font-semibold">Certificate:</span> {form.certificate ? 'Yes' : 'No'}</p>
               <p><span className="font-semibold">Personalized Website:</span> {form.personalized ? 'Yes' : 'No'}</p>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Button type="button" variant="secondary" className="bg-gray-700 hover:bg-gray-800 text-white" onClick={back}>Back</Button>
               <Button type="submit" variant="success" className="bg-green-600 hover:bg-green-700 text-white">Submit</Button>
             </div>

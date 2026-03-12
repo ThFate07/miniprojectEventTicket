@@ -4,6 +4,8 @@ import React from 'react'
 import { useState } from 'react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getEventPrimaryImage } from '@/lib/eventImages';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 // Gold glowing animation with reduced shine
 const goldGlowStyle = `
@@ -51,14 +53,14 @@ const formatDate = (date) => {
 function EventCard({ _id, title, date, category, location, image, description }) {
   return (
     <div
-      className="glass rounded-xl shadow-xl min-h-[500px] overflow-hidden flex flex-col items-center relative transition-transform duration-300 hover:scale-[1.015] border-2"
+      className="section-card min-h-[460px] overflow-hidden flex flex-col items-center relative p-4 transition-transform duration-300 hover:scale-[1.015]"
     >
       <img
         src={image}
         alt={title}
-        className="w-[90%] h-56 max-h-56 object-cover object-center rounded-lg mt-6 shadow-md bg-white"
+        className="h-52 w-full rounded-[1.25rem] object-cover object-center shadow-md bg-white sm:h-56"
       />
-      <div className="p-6 flex flex-col flex-1 w-full items-center gap-1">
+      <div className="flex flex-col flex-1 w-full items-center gap-1 px-2 pb-2 pt-5 sm:px-4">
         <h3 className="text-xl font-semibold text-white mb-2 text-center">{title}</h3>
         <div className="flex flex-wrap items-center gap-3 text-blue-100 text-sm mb-2 justify-center">
           <span className="bg-blue-700 text-white px-2 py-0.5 rounded-full text-xs font-medium">{category}</span>
@@ -85,6 +87,7 @@ function EventCard({ _id, title, date, category, location, image, description })
 const Events = () => {
   const [search, setSearch] = React.useState("");
   const [filter, setFilter] = React.useState("All");
+  const [showFilters, setShowFilters] = React.useState(false);
   const categories = ["All", "Hackathon", "Live Show", "Meetup", "Webinar"];
   const [events , setEvents] = useState([]);
 
@@ -112,46 +115,65 @@ const Events = () => {
   return (
     <>
       <style>{goldGlowStyle}</style>
-      <div className="min-h-screen px-4 py-5 bg-transparent flex flex-col items-center">
-        <p className='text-white text-3xl font-bold self-start px-20 py-4'>Events</p>
-        <div className="w-full px-20 mb-8 flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex flex-col w-1/2">
-            <label htmlFor="search" className="text-white mb-1">Search</label>
-            <Input
-              id="search"
-              type="text"
-              placeholder="Search events..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="h-12 text-white border-white/40 placeholder:text-white/60"
-            />
+      <div className="app-page min-h-screen">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Attendee</p>
+            <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Events</h1>
           </div>
-          <div className="flex flex-col w-1/4">
-            <label htmlFor="category" className="text-white mb-1">Category</label>
-            <select
-              id="category"
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              className="px-2 h-12 text-white placeholder:text-white/60 border-1 rounded-md border-white/40"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <button
+            type="button"
+            onClick={() => setShowFilters((prev) => !prev)}
+            className="inline-flex items-center justify-center gap-2 self-start rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white sm:hidden"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        <div className="section-card mb-8 p-4 sm:p-5">
+          <div className={`mobile-collapse-panel grid gap-4 ${showFilters ? 'max-h-[22rem] opacity-100' : 'max-h-0 opacity-0 sm:max-h-[22rem] sm:opacity-100'} sm:grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)]`}>
+            <div className="flex flex-col">
+              <label htmlFor="search" className="mb-1 text-sm font-medium text-white">Search</label>
+              <Input
+                id="search"
+                type="text"
+                placeholder="Search events..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="h-12 text-white border-white/40 placeholder:text-white/60"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="category" className="mb-1 text-sm font-medium text-white">Category</label>
+              <select
+                id="category"
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                className="h-12 rounded-xl border border-white/20 bg-slate-950/60 px-3 text-white outline-none"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-        <div className="w-full px-20 grid gap-8 grid-cols-1 md:grid-cols-3">
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredEvents.length === 0 ? (
             <div className="col-span-full text-center text-blue-200">No events found.</div>
           ) : (
             filteredEvents.map((event) => (
               <EventCard
+                key={event._id}
                 _id = {event._id}
                 title={event.title}
                 date={event.eventDateTime[0]}
                 category={event.eventType}
                 location={event.location}
-                image={event.image}
+                  image={getEventPrimaryImage(event)}
                 description={event.description}
               />
             ))

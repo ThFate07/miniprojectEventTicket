@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { ChevronDown, Clock3 } from 'lucide-react';
 
 const Seats = () => {
   const [selectedTiming, setSelectedTiming] = useState('');
@@ -14,6 +15,7 @@ const Seats = () => {
   const [lockedSeats, setLockedSeats] = useState(new Set());
   const [seatLocks, setSeatLocks] = useState(new Map());
   const [isSelecting, setIsSelecting] = useState(false);
+  const [showTimings, setShowTimings] = useState(false);
   const socketRef = useRef(null);
   const lockTimeouts = useRef(new Map());
   const { id } = useParams();
@@ -437,18 +439,34 @@ const Seats = () => {
   }
 
   return (
-    <div className="min-h-screen  text-white py-12 px-4">
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
+    <div className="app-page min-h-screen text-white">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Attendee</p>
+          <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">{isGeneralAdmission ? 'Choose Tickets' : 'Choose Seats'}</h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowTimings((prev) => !prev)}
+          className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white lg:hidden"
+        >
+          <Clock3 className="h-4 w-4" />
+          Show timings
+          <ChevronDown className={`h-4 w-4 transition-transform ${showTimings ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Left Section: Available Timings */}
-        <div className="w-full lg:w-1/4 glass rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-bold mb-6">Available Timings</h2>
-          <div className="space-y-4">
+        <div className={`section-card w-full p-5 shadow-lg lg:w-[18rem] lg:flex-shrink-0 ${showTimings ? 'block' : 'hidden lg:block'}`}>
+          <h2 className="mb-4 text-xl font-bold">Available Timings</h2>
+          <div className="space-y-3">
             {eventData.eventDateTime?.map((dateTime, index) => {
               const timing = `${dateTime.date} ${dateTime.time}`;
               return (
                 <button
                   key={timing}
-                  className={`w-full text-left px-4 py-3 rounded-lg flex items-center space-x-3
+                  className={`w-full text-left px-4 py-3 rounded-xl flex items-center space-x-3
                     ${selectedTiming === timing ? 'bg-blue-600 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'}
                     transition-colors duration-200`}
                   onClick={() => setSelectedTiming(timing)}
@@ -462,8 +480,8 @@ const Seats = () => {
         </div>
 
         {/* Right Section: Seat Selection */}
-        <div className="w-full lg:w-3/4 glass rounded-xl p-6 shadow-lg flex flex-col items-center">
-          <h2 className="text-2xl font-bold mb-8">{isGeneralAdmission ? 'Select ticket quantity' : 'Select your seat'}</h2>
+        <div className="section-card flex w-full flex-col items-center p-5 shadow-lg sm:p-6 lg:flex-1">
+          <h2 className="mb-6 text-center text-2xl font-bold">{isGeneralAdmission ? 'Select ticket quantity' : 'Select your seat'}</h2>
 
           {isGeneralAdmission ? (
             <div className="w-full max-w-xl flex flex-col items-center gap-6">
@@ -473,7 +491,7 @@ const Seats = () => {
                 <p className="text-blue-200 mt-2">tickets currently available</p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <button
                   className="h-12 w-12 rounded-full bg-blue-900/70 text-2xl disabled:opacity-40"
                   onClick={() => handleGeneralAdmissionQuantity(selectedSeats.length - 1)}
@@ -481,7 +499,7 @@ const Seats = () => {
                 >
                   -
                 </button>
-                <div className="min-w-28 rounded-xl border border-blue-400/20 px-6 py-4 text-center">
+                <div className="min-w-[6.5rem] rounded-xl border border-blue-400/20 px-4 py-4 text-center sm:min-w-28 sm:px-6">
                   <p className="text-3xl font-bold text-white">{selectedSeats.length}</p>
                   <p className="text-sm text-blue-200">tickets selected</p>
                 </div>
@@ -500,11 +518,13 @@ const Seats = () => {
             </div>
           ) : (
             <>
-              <div className="w-3/4 bg-blue-700 h-2 rounded-full mb-4"></div>
+              <div className="mb-4 h-2 w-full max-w-xl rounded-full bg-blue-700"></div>
               <p className="text-gray-400 text-sm mb-8">SCREEN SIDE</p>
 
-              <div className="grid grid-cols-5 gap-2 justify-center">
-                {renderSeats()}
+              <div className="w-full overflow-x-auto pb-2">
+                <div className="mx-auto grid min-w-max grid-cols-5 gap-2 justify-center">
+                  {renderSeats()}
+                </div>
               </div>
 
               <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
@@ -529,15 +549,15 @@ const Seats = () => {
           )}
 
           {/* Selected Seats and Total */}
-          <div className="mt-8 w-full text-center">
-            <p className="text-lg text-gray-300">{isGeneralAdmission ? 'Selected Tickets' : 'Selected Seats'}: <span className="font-semibold text-white">{isGeneralAdmission ? selectedSeats.length || 'None' : selectedSeats.join(', ') || 'None'}</span></p>
-            <p className="text-lg text-gray-300">Total: <span className="font-semibold text-white">₹{selectedSeats.length * ticketCost}</span></p>
+          <div className="mt-8 w-full rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-center">
+            <p className="text-base text-gray-300 sm:text-lg">{isGeneralAdmission ? 'Selected Tickets' : 'Selected Seats'}: <span className="font-semibold text-white">{isGeneralAdmission ? selectedSeats.length || 'None' : selectedSeats.join(', ') || 'None'}</span></p>
+            <p className="mt-2 text-base text-gray-300 sm:text-lg">Total: <span className="font-semibold text-white">₹{selectedSeats.length * ticketCost}</span></p>
           </div>
 
           {/* Proceed Button */}
-          <div className="mt-6 w-full flex justify-center">
+          <div className="mt-6 flex w-full justify-center">
             <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg bg-blue-600 px-8 py-3 text-lg font-bold text-white shadow-lg transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               disabled={selectedSeats.length === 0}
               onClick={handleProceedToCheckout}
             >

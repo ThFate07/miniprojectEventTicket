@@ -6,10 +6,13 @@ import { useEffect } from 'react';
 import axios from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { userStore } from '@/context/userContext';
+import { getEventImages, getEventPrimaryImage } from '@/lib/eventImages';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const EventDetails = () => {
   // Example event/movie data
   const [event , setEvent] = useState({});
+  const [selectedImage, setSelectedImage] = useState('');
   const {id} = useParams();
   const fetchEvent = async () => {
     console.log(id);
@@ -32,6 +35,27 @@ const [loadingReviews, setLoadingReviews] = useState(false);
 // Replace this with real user ID (from auth)
 const user = userStore((state) => state.user);
 console.log(user)
+const eventImages = getEventImages(event);
+
+const showPreviousImage = () => {
+  if (eventImages.length <= 1) {
+    return;
+  }
+
+  const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
+  const previousIndex = (currentIndex - 1 + eventImages.length) % eventImages.length;
+  setSelectedImage(eventImages[previousIndex]);
+};
+
+const showNextImage = () => {
+  if (eventImages.length <= 1) {
+    return;
+  }
+
+  const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
+  const nextIndex = (currentIndex + 1) % eventImages.length;
+  setSelectedImage(eventImages[nextIndex]);
+};
 
 // Fetch reviews
 const fetchReviews = async () => {
@@ -72,6 +96,11 @@ const submitReview = async () => {
     fetchEvent();
     fetchReviews();
   },[])
+
+  useEffect(() => {
+    setSelectedImage(getEventPrimaryImage(event));
+  }, [event]);
+
   useEffect(() => {
     if (!open && videoRef.current) {
       videoRef.current.currentTime = 0;
@@ -92,18 +121,68 @@ const submitReview = async () => {
       />
       <div className="absolute inset-0 bg-black/70 z-10" />
       {/* Main content */}
-      <div className="my-14 relative z-20 w-full max-w-6xl flex flex-col md:flex-row items-center md:items-start gap-10 px-4 py-16">
+      <div className="app-page relative z-20 my-8 flex w-full max-w-6xl flex-col gap-8 py-8 md:my-10 md:flex-row md:items-start lg:gap-10 lg:py-12">
         {/* Poster */}
-        <img
-          src={event.image}
-          alt={event.title}
-          className="w-full md:w-1/2 max-h-[32rem] object-cover object-center rounded-2xl shadow-4xl border-2 border-amber-500/40 transition-all duration-300 flex-shrink-0"
-        />
+        <div className="w-full md:w-1/2 flex-shrink-0 space-y-4">
+          <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-black/20 shadow-4xl">
+            <img
+              src={selectedImage || event.banner}
+              alt={event.title}
+              className="w-full max-h-[32rem] object-cover object-center transition-all duration-300"
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-blue-100/80">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={showPreviousImage}
+                disabled={eventImages.length <= 1}
+                className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Show previous event image"
+              >
+                <ChevronLeft className="h-5 w-5" />
+                <span>Prev</span>
+              </button>
+              <span className="text-center text-xs uppercase tracking-[0.3em] text-blue-200/70">
+                {eventImages.length > 0 ? `${Math.max(eventImages.indexOf(selectedImage), 0) + 1} / ${eventImages.length}` : '0 / 0'}
+              </span>
+              <button
+                type="button"
+                onClick={showNextImage}
+                disabled={eventImages.length <= 1}
+                className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Show next event image"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            {eventImages.length > 0 && (
+              <div className="flex items-center justify-center gap-2">
+                {eventImages.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedImage(image)}
+                    aria-label={`Show event image ${index + 1}`}
+                    className={`h-2.5 w-8 rounded-full transition-all ${selectedImage === image ? 'bg-white' : 'bg-white/25 hover:bg-white/55'}`}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="text-center text-blue-200/75">
+              {eventImages.length > 1 ? 'Use Prev and Next to browse all event images.' : 'Only one event image is available for this event.'}
+            </div>
+          </div>
+        </div>
         {/* Details */}
-        <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
+        <div className="flex-1 flex flex-col items-center text-center md:items-start md:text-left">
           <span className="uppercase text-blue-400 font-semibold tracking-widest mb-2">{event.status}</span>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">{event.title}</h1>
+          <h1 className="text-3xl font-bold text-white mb-2 sm:text-4xl md:text-5xl">{event.title}</h1>
           <p className="text-blue-100 mb-6 max-w-2xl">{event.description}</p>
+          {eventImages.length > 1 && (
+            <p className="text-sm text-blue-200/80 mb-4">{eventImages.length} event photos available</p>
+          )}
           <div className="text-blue-200 font-medium mb-8">
           {event.eventDateTime && event.eventDateTime.map((date, index)  => (
             <span key={index}>
@@ -116,10 +195,10 @@ const submitReview = async () => {
             </span>
             ))}
           </div>
-          <div className="flex gap-4 flex-wrap justify-center md:justify-start">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center md:justify-start">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <button className="bg-blue-900 hover:bg-blue-800 text-white font-semibold px-6 py-3 rounded-lg transition-colors shadow">Watch Trailer</button>
+                <button className="w-full rounded-lg bg-blue-900 px-6 py-3 font-semibold text-white shadow transition-colors hover:bg-blue-800 sm:w-auto">Watch Trailer</button>
               </DialogTrigger>
               <DialogContent className="bg-black max-w-4xl w-full flex flex-col items-center p-0 overflow-hidden">
                 <div className="w-full" style={{ aspectRatio: '16/7' }}>
@@ -138,13 +217,13 @@ const submitReview = async () => {
                 </div>
               </DialogContent>
             </Dialog>
-            <Link to={`/seats/${id}`}><button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors shadow">Buy Tickets</button></Link>
-            <button className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-3 rounded-full transition-colors shadow border border-white/20 flex items-center justify-center"><span className="text-xl">♡</span></button>
+            <Link to={`/seats/${id}`} className="w-full sm:w-auto"><button className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow transition-colors hover:bg-blue-700">Buy Tickets</button></Link>
+            <button className="flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-3 font-semibold text-white shadow transition-colors hover:bg-white/20 sm:w-auto"><span className="text-xl">♡</span></button>
           </div>
         </div>
       </div>
       {/* Reviews Section */}
-      <div className="relative z-20 w-full max-w-4xl mx-auto px-4 py-8">
+      <div className="app-page relative z-20 w-full max-w-4xl py-4 sm:py-8">
         <h2 className="text-2xl font-bold text-white mb-4">Reviews</h2>
 
         {/* Add New Review */}
@@ -156,7 +235,7 @@ const submitReview = async () => {
             className="w-full p-3 bg-black/30 text-white rounded-lg border border-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
             rows={3}
           />
-          <div className="flex justify-end mt-2">
+          <div className="mt-2 flex justify-end">
             <button
               onClick={submitReview}
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow transition-all"

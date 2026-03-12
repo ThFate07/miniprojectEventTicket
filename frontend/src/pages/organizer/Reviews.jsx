@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Minus, Search, User, Calendar } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Minus, Search, User, Calendar, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ const Reviews = () => {
   });
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Fetch events
   useEffect(() => {
@@ -99,33 +100,48 @@ const Reviews = () => {
   };
 
   return (
-    <div className="min-h-screen px-10 text-white">
-      <h1 className="text-4xl font-bold mb-8 text-center text-blue-300">Event Reviews</h1>
-
-      <div className="mb-8 flex flex-col md:flex-row items-center justify-center gap-4">
-        <select
-          className="glass p-3 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={selectedEvent}
-          onChange={handleEventChange}
+    <div className="min-h-screen text-white">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
+          <h1 className="mt-2 text-3xl font-bold text-blue-300 sm:text-4xl">Event Reviews</h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFilters((prev) => !prev)}
+          className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white md:hidden"
         >
-          <option value="">-- Select an Event --</option>
-          {events.map((event) => (
-            <option key={event._id} value={event._id}>
-              {event.title}
-            </option>
-          ))}
-        </select>
+          Filters
+          <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
 
-        <div className="relative flex items-center">
+      <div className="section-card mb-8 p-4 sm:p-5">
+        <div className={`mobile-collapse-panel grid gap-4 ${showFilters ? 'max-h-[20rem] opacity-100' : 'max-h-[5rem] opacity-100 md:max-h-[20rem]'} md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]`}>
+          <select
+            className="rounded-xl border border-blue-400/20 bg-gray-800 p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={selectedEvent}
+            onChange={handleEventChange}
+          >
+            <option value="">-- Select an Event --</option>
+            {events.map((event) => (
+              <option key={event._id} value={event._id}>
+                {event.title}
+              </option>
+            ))}
+          </select>
+
+          <div className="relative flex items-center">
           <Search className="absolute left-3 w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search reviews..."
-            className="glass pl-10 pr-4 py-3 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-blue-400/20 bg-gray-800 py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+      </div>
       </div>
 
       {loading ? (
@@ -138,7 +154,7 @@ const Reviews = () => {
               <ThumbsUp />
               Positive Reviews ({reviews.positive.length})
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {reviews.positive
                 .filter(review => review.review.toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(review => (
@@ -153,7 +169,7 @@ const Reviews = () => {
               <Minus />
               Neutral Reviews ({reviews.neutral.length})
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {reviews.neutral
                 .filter(review => review.review.toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(review => (
@@ -168,7 +184,7 @@ const Reviews = () => {
               <ThumbsDown />
               Negative Reviews ({reviews.negative.length})
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {reviews.negative
                 .filter(review => review.review.toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(review => (

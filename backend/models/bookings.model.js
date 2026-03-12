@@ -28,6 +28,10 @@ const bookingSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  ticket_redeemedAt: {
+    type: Date,
+    default: null
+  },
   ticket_qr : {
     type : String,
     required : true

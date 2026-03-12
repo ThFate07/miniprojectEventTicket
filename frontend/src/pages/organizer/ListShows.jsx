@@ -57,12 +57,20 @@ const ListShows = () => {
   };
 
   return (
-    <div className="min-h-screen  text-white">
-      <h1 className="text-4xl font-bold mb-8 text-center text-blue-300">Your Shows</h1>
+    <div className="min-h-screen text-white">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
+          <h1 className="mt-2 text-3xl font-bold text-blue-300 sm:text-4xl">Your Shows</h1>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-blue-100/80">
+          Review performance, open event details, or jump into edits without the action buttons collapsing off-screen.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {shows.map((show) => (
-          <div key={show._id} className="glass rounded-lg shadow-xl overflow-hidden border border-blue-400/20">
+          <div key={show._id} className="section-card overflow-hidden rounded-[1.5rem]">
             <img src={show.banner} alt={show.title} className="w-full h-48 object-cover" />
             <div className="p-6">
               <h3 className="text-xl font-bold text-white mb-2">{show.title}</h3>
@@ -89,14 +97,14 @@ const ListShows = () => {
                 <span className="text-blue-200">Revenue:</span>
                 <span className="font-semibold text-white">₹{show.totalRevenue}</span>
               </div>
-              <div className="flex gap-4 mt-6">
-                <button onClick={() => handleView(show._id)} className="flex-1 flex items-center justify-center gap-2 border border-blue-600 text-blue-400 font-bold py-2 rounded-lg transition-colors hover:bg-blue-900/20">
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <button onClick={() => handleView(show._id)} className="flex items-center justify-center gap-2 rounded-lg border border-blue-600 py-2 font-bold text-blue-400 transition-colors hover:bg-blue-900/20">
                   <Eye className="w-4 h-4" /> View
                 </button>
-                <button onClick={() => handleEdit(show._id)} className="flex-1 flex items-center justify-center gap-2 border border-yellow-600 text-yellow-400 font-bold py-2 rounded-lg transition-colors hover:bg-yellow-900/20">
+                <button onClick={() => handleEdit(show._id)} className="flex items-center justify-center gap-2 rounded-lg border border-yellow-600 py-2 font-bold text-yellow-400 transition-colors hover:bg-yellow-900/20">
                   <Edit className="w-4 h-4" /> Edit
                 </button>
-                <button onClick={() => handleDelete(show._id)} className="flex-1 flex items-center justify-center gap-2 border border-red-600 text-red-400 font-bold py-2 rounded-lg transition-colors hover:bg-red-900/20">
+                <button onClick={() => handleDelete(show._id)} className="flex items-center justify-center gap-2 rounded-lg border border-red-600 py-2 font-bold text-red-400 transition-colors hover:bg-red-900/20">
                   <Trash2 className="w-4 h-4" /> Delete
                 </button>
               </div>

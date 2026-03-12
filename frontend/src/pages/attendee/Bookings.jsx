@@ -1,17 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { Download, Share2 } from 'lucide-react';
+import { downloadTicketPdf, shareTicketPdf } from '@/lib/ticketPdf';
+import { getEventPrimaryImage } from '@/lib/eventImages';
 
 const BookingCard = ({ booking }) => {
   const event = booking.event_id;
+  const eventImage = getEventPrimaryImage(event);
 
   if (!event) return null;
 
+  const handleDownload = () => {
+    try {
+      downloadTicketPdf({ booking, event });
+    } catch (error) {
+      toast.error(error.message || 'Unable to download ticket.');
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await shareTicketPdf({ booking, event });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
+
+      toast.error(error.message || 'Unable to share ticket.');
+    }
+  };
+
   return (
     <div className="glass rounded-xl shadow-lg overflow-hidden flex flex-col items-center relative">
-      {event.image && (
+      {eventImage && (
         <img
-          src={event.image}
+          src={eventImage}
           alt={event.title}
           className="w-3/4 h-56 max-h-56 object-cover object-center rounded-lg mt-6 shadow-lg border-1 bg-white"
         />
@@ -44,8 +69,25 @@ const BookingCard = ({ booking }) => {
           Status: {booking.event_status}
         </div>
 
+        <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+          <button
+            onClick={handleDownload}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/45 hover:bg-emerald-500/18"
+          >
+            <Download className="h-4 w-4" />
+            Download Ticket
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/45 hover:bg-sky-500/18"
+          >
+            <Share2 className="h-4 w-4" />
+            Share Ticket
+          </button>
+        </div>
+
         <Link to={`/events/${event._id}`}>
-          <button className="mt-4 bg-blue-700 hover:bg-blue-800 px-4 text-white font-semibold py-2 rounded-lg transition-colors shadow glow-blue w-full">
+          <button className="mt-4 w-full rounded-xl border border-blue-300/25 bg-blue-600/80 px-4 py-3 text-white font-semibold shadow-lg shadow-blue-950/25 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-600">
             View Event
           </button>
         </Link>
@@ -78,14 +120,17 @@ const MyBookings = () => {
   }, []);
 
   return (
-    <div className="min-h-screen px-4 py-5 bg-transparent flex flex-col items-center">
-      <p className="text-white text-3xl font-bold self-start px-20 py-4">My Bookings</p>
+    <div className="app-page min-h-screen">
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Attendee</p>
+        <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">My Bookings</h1>
+      </div>
       {loading ? (
         <p className="text-blue-200 text-center mt-10">Loading bookings...</p>
       ) : bookings.length === 0 ? (
         <p className="text-blue-200 text-center mt-10">You haven't booked any events yet.</p>
       ) : (
-        <div className="w-full px-20 grid gap-8 grid-cols-1 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {bookings.map((booking) => (
             <BookingCard key={booking._id} booking={booking} />
           ))}

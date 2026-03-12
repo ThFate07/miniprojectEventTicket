@@ -19,6 +19,10 @@ const eventSchema = new mongoose.Schema({
   type: String,
   required: false
   },
+  images: [{
+    type: String,
+    trim: true,
+  }],
   eventDateTime: [{
     type:Date,
     required: true

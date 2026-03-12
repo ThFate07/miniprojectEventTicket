@@ -8,7 +8,91 @@ import { areArraysEqual } from "../utils/arrayUtils.js";
 import { confirmationFormat, mail } from "../utils/email.js";
 import dayjs from 'dayjs';
 import mongoose from 'mongoose';
+import crypto from 'node:crypto';
 import { Payment } from "../models/payment.model.js";
+
+const QR_SIGNING_VERSION = 'v1';
+
+const getQrSigningSecret = () => process.env.QR_SIGNING_SECRET || process.env.JWT_SECRET;
+
+const signTicketPayload = (payload) => {
+  const secret = getQrSigningSecret();
+
+  if (!secret) {
+    throw new Error('QR signing secret is not configured');
+  }
+
+  return crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+};
+
+const buildSignedTicketPayload = ({ bookingId, eventId, organizerId, userId, seats, bookingDateTime, paymentId }) => {
+  const payload = {
+    v: QR_SIGNING_VERSION,
+    bookingId,
+    eventId,
+    organizerId,
+    userId,
+    seats,
+    bookingDateTime: new Date(bookingDateTime).toISOString(),
+    paymentId,
+  };
+
+  return {
+    ...payload,
+    sig: signTicketPayload(payload),
+  };
+};
+
+const signaturesMatch = (expected, received) => {
+  if (!expected || !received || expected.length !== received.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'));
+};
+
+const parseSignedTicketPayload = (qrData) => {
+  const parsedPayload = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+
+  if (!parsedPayload || typeof parsedPayload !== 'object') {
+    throw new Error('Ticket payload is invalid');
+  }
+
+  const { sig, ...payload } = parsedPayload;
+
+  if (!sig || typeof sig !== 'string') {
+    throw new Error('Ticket signature is missing');
+  }
+
+  const expectedSignature = signTicketPayload(payload);
+
+  if (!signaturesMatch(expectedSignature, sig)) {
+    throw new Error('Ticket signature is invalid');
+  }
+
+  return payload;
+};
+
+const normalizeEventImages = (images, image) => {
+  const normalizedImages = Array.isArray(images)
+    ? images
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter(Boolean)
+    : [];
+
+  if (normalizedImages.length > 0) {
+    return normalizedImages;
+  }
+
+  if (typeof image === 'string' && image.trim()) {
+    return [image.trim()];
+  }
+
+  return [];
+};
 
 const getEvents = asyncHandler(async (req, res) => {
   let events = await Event.find({}).select(
@@ -132,7 +216,8 @@ const postEvent = asyncHandler(async (req, res) => {
     location,
     eventType,
     banner,
-    image ,
+    image,
+    images,
     eventDateTime,
     seats,
     seatMap,
@@ -154,6 +239,15 @@ const postEvent = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "All required fields must be provided.",
+    });
+  }
+
+  const normalizedImages = normalizeEventImages(images, image);
+
+  if (normalizedImages.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "At least one event image must be provided.",
     });
   }
 
@@ -210,7 +304,8 @@ const postEvent = asyncHandler(async (req, res) => {
     location,
     eventType,
     banner,
-    image,
+    image: normalizedImages[0],
+    images: normalizedImages,
     eventDateTime,
     seats,
     seatMap: finalSeatMap,
@@ -244,6 +339,20 @@ const updateMyEvent = asyncHandler(async (req, res) => {
   }
 
   const updateData = { ...req.body };
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'images') || Object.prototype.hasOwnProperty.call(req.body, 'image')) {
+    const normalizedImages = normalizeEventImages(req.body.images, req.body.image);
+
+    if (normalizedImages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one event image must be provided.",
+      });
+    }
+
+    updateData.images = normalizedImages;
+    updateData.image = normalizedImages[0];
+  }
 
   const updatedEvent = await Event.findByIdAndUpdate(
     id,
@@ -327,7 +436,7 @@ const getBookings = asyncHandler(async(req , res) => {
 const getMyBookings = asyncHandler(async(req , res) => {
   const userId = req.user.id ;
   const bookings = await Booking.find({ user_id: userId })
-    .populate("event_id", "title eventDateTime location image eventType");
+    .populate("event_id", "title eventDateTime location image images eventType");
 
     if (!bookings.length) {
     return res.status(404).json({
@@ -502,14 +611,18 @@ const bookTicket = asyncHandler(async (req, res) => {
     event.totalRevenue = (event.totalRevenue || 0) + Number(paymentAmt);
     await event.save();
 
-    // Generate QR code
-    const qrCodeData = {
-      event: event_id,
-      user: user_id,
+    const bookingId = new mongoose.Types.ObjectId();
+
+    // Generate QR code with a signed payload so organizers can verify tickets server-side.
+    const qrCodeData = buildSignedTicketPayload({
+      bookingId: bookingId.toString(),
+      eventId: event_id,
+      organizerId: event.organizer.toString(),
+      userId: user_id,
       seats: seatList,
-      time: booking_dateTime,
-      payment: payment_id
-    };
+      bookingDateTime: booking_dateTime,
+      paymentId: payment_id,
+    });
     const qrCode = await generateTicketQR(qrCodeData);
 
     // Create booking
@@ -518,6 +631,7 @@ const bookTicket = asyncHandler(async (req, res) => {
       : seatList.join(',');
 
     const booking = await Booking.create({
+      _id: bookingId,
       user_id,
       event_id,
       event_title: event.title,
@@ -594,6 +708,104 @@ const bookTicket = asyncHandler(async (req, res) => {
       message: error.message
     });
   }
+});
+
+const validateTicketEntry = asyncHandler(async (req, res) => {
+  const organizerId = req.user.id;
+  const { qrData, eventId } = req.body;
+
+  if (!qrData) {
+    return res.status(400).json({
+      success: false,
+      message: 'QR data is required',
+    });
+  }
+
+  let ticketPayload;
+
+  try {
+    ticketPayload = parseSignedTicketPayload(qrData);
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Ticket QR code is invalid',
+    });
+  }
+
+  const booking = await Booking.findById(ticketPayload.bookingId)
+    .populate('user_id', 'username email')
+    .populate('event_id', 'title');
+
+  if (!booking) {
+    return res.status(404).json({
+      success: false,
+      message: 'Booking not found for this ticket',
+    });
+  }
+
+  const bookingEventId = booking.event_id?._id?.toString() || booking.event_id?.toString();
+  const bookingOrganizerId = booking.organizer_id?.toString();
+  const bookingUserId = booking.user_id?._id?.toString() || booking.user_id?.toString();
+
+  if (bookingOrganizerId !== organizerId || ticketPayload.organizerId !== organizerId) {
+    return res.status(403).json({
+      success: false,
+      message: 'You are not allowed to validate this ticket',
+    });
+  }
+
+  if (eventId && bookingEventId !== eventId) {
+    return res.status(400).json({
+      success: false,
+      message: 'This ticket belongs to a different event',
+    });
+  }
+
+  if (
+    ticketPayload.v !== QR_SIGNING_VERSION ||
+    ticketPayload.eventId !== bookingEventId ||
+    ticketPayload.userId !== bookingUserId ||
+    ticketPayload.paymentId !== booking.payment_id
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Ticket data does not match the stored booking',
+    });
+  }
+
+  if (booking.ticket_redeem) {
+    return res.status(409).json({
+      success: false,
+      message: 'Ticket has already been redeemed',
+      booking: {
+        id: booking._id,
+        attendeeName: booking.user_id?.username || 'Unknown',
+        attendeeEmail: booking.user_id?.email || '',
+        eventTitle: booking.event_id?.title || 'Event',
+        seats: booking.seats,
+        paymentAmt: booking.paymentAmt,
+        redeemedAt: booking.ticket_redeemedAt,
+      },
+    });
+  }
+
+  booking.ticket_redeem = true;
+  booking.ticket_redeemedAt = new Date();
+  await booking.save();
+
+  return res.status(200).json({
+    success: true,
+    message: 'Ticket validated and redeemed successfully',
+    booking: {
+      id: booking._id,
+      attendeeName: booking.user_id?.username || 'Unknown',
+      attendeeEmail: booking.user_id?.email || '',
+      eventTitle: booking.event_id?.title || 'Event',
+      seats: booking.seats,
+      paymentAmt: booking.paymentAmt,
+      redeemedAt: booking.ticket_redeemedAt,
+    },
+  });
 });
 
 const getBookedEvents = asyncHandler(async (req, res) => {
@@ -840,4 +1052,4 @@ const checkSeatsAvailabilityWithLocks = asyncHandler(async (req, res) => {
   }
 });
 
-export { getEvents, getEventById, postEvent, getEventSeatsAndTimings , getMyEvents , getMyEventById , updateMyEvent , deleteMyEvent , getBookings , getMyBookings , getOrganizerSummary ,  bookTicket , checkSeatsAvailability  , getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks};
+export { getEvents, getEventById, postEvent, getEventSeatsAndTimings , getMyEvents , getMyEventById , updateMyEvent , deleteMyEvent , getBookings , getMyBookings , getOrganizerSummary ,  bookTicket , validateTicketEntry, checkSeatsAvailability  , getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks};

@@ -25,41 +25,46 @@ const featureCards = [
   {
     title: "Event setup without friction",
     description:
-      "Build seated or general admission experiences with a cleaner organizer flow and launch-ready event pages.",
+      "Launch seated or general admission events with pricing, schedules, and venue details in one cleaner flow.",
     icon: CalendarCheck2,
     accent: "from-[#ffb65c] to-[#f07c52]",
   },
   {
     title: "Ticketing that feels invisible",
     description:
-      "Seat selection, confirmations, and attendee access stay in one place so booking feels fast instead of stressful.",
+      "Keep seat selection, confirmations, and attendee access together so booking stays fast and predictable.",
     icon: Ticket,
     accent: "from-[#2cc4b0] to-[#1d8f87]",
   },
   {
     title: "Confidence on event day",
-    description: "Keep fraud low with QR validation, secure check-ins, and the guardrails organizers actually need.",
+    description: "Handle check-ins with QR validation and the guardrails organizers need when the crowd arrives.",
     icon: ShieldCheck,
     accent: "from-[#f4d58d] to-[#d7a45b]",
   },
   {
     title: "Audience insights that matter",
-    description: "Track bookings, revenue, and post-event sentiment without exporting spreadsheets all afternoon.",
+    description: "Track bookings, revenue, and feedback without stitching together separate admin tools.",
     icon: BarChart3,
     accent: "from-[#65c9ff] to-[#347fe7]",
   },
 ];
 
-const spotlightMoments = [
+const journeySteps = [
   {
-    label: "For organizers",
-    title: "Create a show page that looks premium from day one.",
-    copy: "Launch with schedules, pricing, and venue details that feel curated instead of assembled from separate tools.",
+    title: "Discover",
+    copy: "Upcoming events stay easy to browse with clear timing, venue context, and availability cues.",
+    icon: Users,
   },
   {
-    label: "For attendees",
-    title: "Go from discovery to seat selection in a single, clear flow.",
-    copy: "Browse upcoming events, reserve seats, and keep your booking history close without bouncing between screens.",
+    title: "Reserve",
+    copy: "Attendees move from event details to seats and checkout without unnecessary detours.",
+    icon: MapPinned,
+  },
+  {
+    title: "Return",
+    copy: "Teams can follow up with reviews, reports, and marketing from the same product after the show ends.",
+    icon: Star,
   },
 ];
 
@@ -86,6 +91,8 @@ const showcaseCards = [
     tone: "bg-[#f4d58d]",
   },
 ];
+
+const heroNotes = ["Priority support", "QR ticketing", "Seat locking"];
 
 const Landing = () => {
   const [testimonials, setTestimonials] = useState([]);
@@ -116,14 +123,14 @@ const Landing = () => {
 
   return (
     <div className="site-shell overflow-hidden text-white">
-      <section className="relative px-4 pb-18 pt-10 sm:px-6 lg:px-8">
+      <section className="relative px-4 pb-16 pt-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#171717]/85 px-6 py-10 shadow-[0_32px_120px_rgba(0,0,0,0.45)] backdrop-blur md:px-10 md:py-14">
-            <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-r from-[#ffb65c]/18 via-transparent to-[#2cc4b0]/18" />
-            <div className="absolute -left-16 top-14 h-44 w-44 rounded-full bg-[#f07c52]/18 blur-3xl" />
-            <div className="absolute right-0 top-28 h-56 w-56 rounded-full bg-[#2cc4b0]/16 blur-3xl" />
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#171717]/85 px-6 py-10 shadow-[0_32px_120px_rgba(0,0,0,0.45)] backdrop-blur md:px-10 md:py-12">
+            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-[#ffb65c]/14 via-transparent to-[#2cc4b0]/14" />
+            <div className="absolute -left-16 top-14 h-36 w-36 rounded-full bg-[#f07c52]/14 blur-3xl" />
+            <div className="absolute right-0 top-24 h-48 w-48 rounded-full bg-[#2cc4b0]/12 blur-3xl" />
 
-            <div className="relative grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div className="relative grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
               <div>
                 <Badge className="mb-6 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[0.72rem] uppercase tracking-[0.24em] text-[#f7e6c3] backdrop-blur">
                   <Sparkles className="mr-2 h-4 w-4 text-[#ffb65c]" />
@@ -138,6 +145,14 @@ const Landing = () => {
                   HostMyShow brings event creation, bookings, ticketing, reviews, and attendee communication into one
                   polished flow that feels modern on both sides of the stage.
                 </p>
+
+                <div className="mt-6 flex flex-wrap gap-3 text-sm text-[#d6d3d1]">
+                  {heroNotes.map(note => (
+                    <span key={note} className="rounded-full border border-white/10 bg-white/6 px-4 py-2">
+                      {note}
+                    </span>
+                  ))}
+                </div>
 
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                   <Link to="/organizer/dashboard">
@@ -156,21 +171,21 @@ const Landing = () => {
                   </Link>
                 </div>
 
-                <div className="mt-10 grid gap-4 sm:grid-cols-3">
+                <div className="mt-10 grid gap-3 sm:grid-cols-3">
                   {dashboardStats.map(stat => (
                     <div
                       key={stat.label}
-                      className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4 backdrop-blur"
+                      className="rounded-[1.35rem] border border-white/10 bg-black/20 p-4 backdrop-blur"
                     >
-                      <p className="text-3xl font-bold text-[#fff5e7]">{stat.value}</p>
+                      <p className="text-2xl font-bold text-[#fff5e7] sm:text-3xl">{stat.value}</p>
                       <p className="mt-2 text-sm leading-6 text-[#b9c0ca]">{stat.label}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="relative mx-auto w-full max-w-[34rem]">
-                <div className="absolute -top-10 right-8 rounded-full border border-[#f4d58d]/30 bg-[#f4d58d]/12 px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#fff3dd] backdrop-blur">
+              <div className="relative mx-auto w-full max-w-[32rem]">
+                <div className="absolute -top-8 right-6 rounded-full border border-[#f4d58d]/30 bg-[#f4d58d]/12 px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#fff3dd] backdrop-blur">
                   Curated booking flow
                 </div>
                 <div className="rounded-[2rem] border border-white/10 bg-[#0f0f10] p-4 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
@@ -180,7 +195,7 @@ const Landing = () => {
                         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#7c6f62]">
                           Tonight's spotlight
                         </p>
-                        <h2 className="font-display mt-3 text-3xl leading-tight text-[#171717]">
+                        <h2 className="font-display mt-3 text-2xl leading-tight text-[#171717] sm:text-3xl">
                           Design people, music lovers, founders, all in one venue.
                         </h2>
                       </div>
@@ -190,54 +205,48 @@ const Landing = () => {
                       </div>
                     </div>
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
-                      <div className="rounded-[1.5rem] bg-[#171717] p-5 text-[#faf2e6]">
-                        <div className="flex items-center gap-3 text-sm text-[#d7cab3]">
-                          <CalendarCheck2 className="h-4 w-4 text-[#ffb65c]" />
-                          Sat, 22 Jun
-                          <Clock3 className="ml-3 h-4 w-4 text-[#2cc4b0]" />
-                          7:30 PM
-                        </div>
-                        <div className="mt-5 rounded-[1.25rem] bg-white/6 p-4">
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.18em] text-[#d7cab3]">Occupancy</p>
-                              <p className="mt-2 text-3xl font-bold">312 / 372</p>
-                            </div>
-                            <p className="rounded-full bg-[#2cc4b0]/16 px-3 py-1 text-xs font-semibold text-[#6de1d1]">
-                              On track
-                            </p>
-                          </div>
-                          <div className="mt-4 h-2 rounded-full bg-white/10">
-                            <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-[#ffb65c] via-[#f07c52] to-[#2cc4b0]" />
-                          </div>
-                        </div>
+                    <div className="mt-6 rounded-[1.5rem] bg-[#171717] p-5 text-[#faf2e6]">
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-[#d7cab3]">
+                        <CalendarCheck2 className="h-4 w-4 text-[#ffb65c]" />
+                        Sat, 22 Jun
+                        <Clock3 className="h-4 w-4 text-[#2cc4b0]" />
+                        7:30 PM
                       </div>
-
-                      <div className="space-y-3">
-                        {showcaseCards.map(card => (
-                          <div
-                            key={card.title}
-                            className="rounded-[1.35rem] border border-[#e7ddcf] bg-white p-4 shadow-sm"
-                          >
-                            <div className={`mb-3 h-2 w-16 rounded-full ${card.tone}`} />
-                            <p className="font-semibold text-[#171717]">{card.title}</p>
-                            <p className="mt-1 text-sm text-[#6b7280]">{card.meta}</p>
+                      <div className="mt-5 rounded-[1.25rem] bg-white/6 p-4">
+                        <div className="flex items-end justify-between gap-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.18em] text-[#d7cab3]">Occupancy</p>
+                            <p className="mt-2 text-3xl font-bold">312 / 372</p>
                           </div>
-                        ))}
+                          <p className="rounded-full bg-[#2cc4b0]/16 px-3 py-1 text-xs font-semibold text-[#6de1d1]">
+                            On track
+                          </p>
+                        </div>
+                        <div className="mt-4 h-2 rounded-full bg-white/10">
+                          <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-[#ffb65c] via-[#f07c52] to-[#2cc4b0]" />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3 text-sm text-[#4b5563]">
-                      <span className="rounded-full bg-[#fff3dd] px-3 py-2 font-medium text-[#8a5d1d]">
-                        Priority support
-                      </span>
-                      <span className="rounded-full bg-[#dff8f5] px-3 py-2 font-medium text-[#0c766d]">
-                        QR ticketing
-                      </span>
-                      <span className="rounded-full bg-[#f3ede3] px-3 py-2 font-medium text-[#6b4e2e]">
-                        Seat locking
-                      </span>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      {showcaseCards.map(card => (
+                        <div
+                          key={card.title}
+                          className="rounded-[1.35rem] border border-[#e7ddcf] bg-white p-4 shadow-sm"
+                        >
+                          <div className={`mb-3 h-2 w-14 rounded-full ${card.tone}`} />
+                          <p className="font-semibold text-[#171717]">{card.title}</p>
+                          <p className="mt-1 text-sm text-[#6b7280]">{card.meta}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-[#4b5563]">
+                      {heroNotes.map(note => (
+                        <span key={note} className="rounded-full bg-[#f3ede3] px-3 py-2 font-medium text-[#6b4e2e]">
+                          {note}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -249,23 +258,27 @@ const Landing = () => {
 
       <section id="features" className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
             <div className="rounded-[2rem] border border-white/10 bg-black/20 p-7 backdrop-blur">
-              <p className="text-sm uppercase tracking-[0.28em] text-[#f4d58d]">Why it feels different</p>
+              <p className="text-sm uppercase tracking-[0.28em] text-[#f4d58d]">What stays central</p>
               <h2 className="font-display mt-4 text-4xl leading-tight text-[#fff8ef] sm:text-5xl">
-                Less dashboard clutter. More confidence for every event team.
+                One product for the entire event loop.
               </h2>
               <p className="mt-5 max-w-xl text-base leading-8 text-[#bfc7d0]">
-                The redesign direction moves away from generic SaaS gradients and toward a richer event brand language:
-                warmer surfaces, stronger hierarchy, and more tactile panels.
+                The landing page works better when it leads with product value: set up the event, sell confidently,
+                and keep the attendee relationship after the show.
               </p>
 
               <div className="mt-8 space-y-4">
-                {spotlightMoments.map(moment => (
-                  <div key={moment.title} className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
-                    <p className="text-xs uppercase tracking-[0.24em] text-[#ffb65c]">{moment.label}</p>
-                    <h3 className="mt-3 text-2xl font-semibold text-[#fff5e7]">{moment.title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-[#b9c0ca]">{moment.copy}</p>
+                {journeySteps.map(step => (
+                  <div key={step.title} className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+                        <step.icon className="h-5 w-5 text-[#fff5e7]" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-[#fff5e7]">{step.title}</h3>
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-[#b9c0ca]">{step.copy}</p>
                   </div>
                 ))}
               </div>
@@ -294,65 +307,46 @@ const Landing = () => {
       </section>
 
       <section className="px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#201915] via-[#191717] to-[#101516] p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-[#f4d58d]">Experience stack</p>
-                <h2 className="font-display mt-4 text-4xl leading-tight text-[#fff5e7]">
-                  Discovery, booking, and follow-up on one rhythm.
-                </h2>
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm text-[#d6d3d1]">
-                Built for hackathons, concerts, meetups, and conferences
-              </div>
-            </div>
+            <p className="text-sm uppercase tracking-[0.28em] text-[#f4d58d]">Built for real teams</p>
+            <h2 className="font-display mt-4 max-w-3xl text-4xl leading-tight text-[#fff5e7]">
+              Clear enough for attendees, robust enough for organizers.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[#c8ced6]">
+              Instead of stacking more panels, the page now gives each message a single job: show the promise, explain
+              the workflow, then prove people trust it.
+            </p>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/15 p-5">
-                <Users className="h-6 w-6 text-[#ffb65c]" />
-                <p className="mt-5 text-xl font-semibold text-white">Audience discovery</p>
-                <p className="mt-3 text-sm leading-7 text-[#b9c0ca]">
-                  Surface what is happening soon, where it is, and why it matters in seconds.
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/15 p-5">
-                <MapPinned className="h-6 w-6 text-[#2cc4b0]" />
-                <p className="mt-5 text-xl font-semibold text-white">Venue clarity</p>
-                <p className="mt-3 text-sm leading-7 text-[#b9c0ca]">
-                  Keep schedules, capacity, and seating context visible instead of buried inside forms.
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/15 p-5">
-                <Star className="h-6 w-6 text-[#f4d58d]" />
-                <p className="mt-5 text-xl font-semibold text-white">Better follow-through</p>
-                <p className="mt-3 text-sm leading-7 text-[#b9c0ca]">
-                  Collect reviews and feedback after the show while the experience is still fresh.
-                </p>
-              </div>
+              {journeySteps.map(step => (
+                <div key={step.title} className="rounded-[1.5rem] border border-white/10 bg-black/15 p-5">
+                  <step.icon className="h-6 w-6 text-[#f4d58d]" />
+                  <p className="mt-5 text-xl font-semibold text-white">{step.title}</p>
+                  <p className="mt-3 text-sm leading-7 text-[#b9c0ca]">{step.copy}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="rounded-[2rem] border border-[#f2e6d4] bg-[#f8efe1] p-7 text-[#171717] shadow-[0_24px_60px_rgba(0,0,0,0.2)]">
-            <p className="text-sm uppercase tracking-[0.28em] text-[#8a5d1d]">Quick pulse</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-[#8a5d1d]">Why it lands better</p>
             <h3 className="font-display mt-4 text-4xl leading-tight">
-              A landing direction with more identity and less template energy.
+              Fewer competing ideas, stronger product signal.
             </h3>
-            <div className="mt-8 space-y-4">
-              <div className="rounded-[1.4rem] bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#78716c]">Primary palette</p>
-                <div className="mt-4 flex gap-3">
-                  <span className="h-10 w-10 rounded-full bg-[#171717]" />
-                  <span className="h-10 w-10 rounded-full bg-[#ffb65c]" />
-                  <span className="h-10 w-10 rounded-full bg-[#2cc4b0]" />
-                  <span className="h-10 w-10 rounded-full border border-[#eadcca] bg-[#faf2e6]" />
-                </div>
+            <div className="mt-8 space-y-4 text-sm leading-7 text-[#57534e]">
+              <div className="rounded-[1.4rem] bg-white p-5">
+                <p className="font-semibold text-[#171717]">Cleaner hierarchy</p>
+                <p className="mt-2">The hero carries the main story, while the next sections support it instead of repeating it.</p>
+              </div>
+              <div className="rounded-[1.4rem] bg-white p-5">
+                <p className="font-semibold text-[#171717]">Better scanning</p>
+                <p className="mt-2">Support details are grouped into concise cards so the page feels lighter on first read.</p>
               </div>
               <div className="rounded-[1.4rem] bg-[#171717] p-5 text-[#faf2e6]">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#c8bda9]">Design notes</p>
-                <p className="mt-3 text-sm leading-7 text-[#ddd6cc]">
-                  Fraunces handles the hero and section headings, while Space Grotesk keeps everything else sharp and
-                  contemporary.
+                <p className="font-semibold text-white">Same visual direction</p>
+                <p className="mt-2 text-[#ddd6cc]">
+                  The palette, typography, and premium tone stay intact, but the layout no longer fights for attention.
                 </p>
               </div>
             </div>
@@ -445,11 +439,11 @@ const Landing = () => {
               <div className="max-w-3xl">
                 <p className="text-sm uppercase tracking-[0.28em] text-white/75">Next step</p>
                 <h2 className="font-display mt-4 text-4xl leading-tight text-white sm:text-5xl">
-                  If this style direction works, the rest of the product should inherit the same confidence.
+                  Bring the same clarity from discovery to checkout and every organizer workflow after that.
                 </h2>
                 <p className="mt-5 text-base leading-8 text-white/80 sm:text-lg">
-                  Start with the landing page, validate the palette and type system, then extend the same approach to
-                  discovery, checkout, and organizer dashboards.
+                  The landing page now leads with the product more clearly. The same cleanup can carry through events,
+                  seat selection, checkout, and the organizer dashboards.
                 </p>
               </div>
 

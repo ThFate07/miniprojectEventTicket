@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -16,9 +16,10 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const navLinks = [
-    { to: "/", label: "Home" },
+    { to: user?.role === "Organizer" ? "/organizer/dashboard" : "/", label: user?.role === "Organizer" ? "Organizer Dashboard" : "Home" },
     { to: "/events", label: "Events" },
   ];
 
@@ -57,6 +58,11 @@ const Navbar = () => {
   useEffect(() => {
     setMobileOpen(false);
   }, [isAuth, user?.role]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setShowDropdown(false);
+  }, [location.pathname]);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#120f0d]/72 backdrop-blur-xl">

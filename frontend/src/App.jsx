@@ -22,6 +22,7 @@ const DashboardHome = lazy(() => import('./pages/organizer/DashboardHome'));
 const AddEvent = lazy(() => import('./pages/organizer/AddEvent'));
 const ListShows = lazy(() => import('./pages/organizer/ListShows'));
 const ListBookings = lazy(() => import('./pages/organizer/ListBookings'));
+const ScanEntry = lazy(() => import('./pages/organizer/ScanEntry'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const ShowDetails = lazy(() => import('./pages/organizer/ShowDetails'));
 const EditEvent = lazy(() => import('./pages/organizer/EditEvent'));
@@ -139,6 +140,7 @@ const App = () => {
             <Route path="add-event" element={<AddEvent />} />
             <Route path="list-shows" element={<ListShows />} />
             <Route path="list-bookings" element={<ListBookings />} />
+            <Route path="scan-entry" element={<ScanEntry />} />
             <Route path="reviews" element={<Reviews />} />
             <Route path="marketing" element={<Marketing />} />
             <Route path="show/:id" element={<ShowDetails />} />
