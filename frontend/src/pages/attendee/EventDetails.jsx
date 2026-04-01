@@ -65,7 +65,10 @@ const fetchReviews = async () => {
     const positiveReviews = res.data.data.positive || [];
     const neutralReviews = res.data.data.neutral || [];
     const negativeReviews = res.data.data.negative || [];
-    setReviews(positiveReviews || neutralReviews || negativeReviews);
+    const mergedReviews = [...positiveReviews, ...neutralReviews, ...negativeReviews].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    setReviews(mergedReviews);
   } catch (err) {
     console.error("Error fetching reviews", err);
   } finally {
@@ -79,7 +82,6 @@ const submitReview = async () => {
 
   try {
     await axios.post(`${import.meta.env.VITE_API}/review/addreview`, {
-      user_id: user.id,
       event_id: id,
       review: newReview,
     });
@@ -250,8 +252,8 @@ const submitReview = async () => {
             <p className="text-blue-300">No reviews yet. Be the first to add one!</p>
           ) : (
             reviews.map((review, index) => (
-              <div key={index} className="bg-white/5 p-3 rounded-lg border border-white/10">
-                <span className="text-lg text-blue-400 mt-1 block">{user.username}</span>
+              <div key={review?._id || index} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                <span className="text-lg text-blue-400 mt-1 block">{review?.user_id?.username || 'Anonymous'}</span>
                 <p className="text-blue-100 text-sm mt-1">{review.review}</p>
               </div>
             ))

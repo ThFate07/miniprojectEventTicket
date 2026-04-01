@@ -70,9 +70,9 @@ const Navbar = () => {
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fff3dd] text-lg font-bold text-[#171717] shadow-sm">
-              H
+              B
             </span>
-            <span className="font-display text-2xl text-[#fff8ef]">HostMyShow</span>
+            <span className="font-display text-2xl text-[#fff8ef]">Book My Event</span>
           </Link>
         </div>
 

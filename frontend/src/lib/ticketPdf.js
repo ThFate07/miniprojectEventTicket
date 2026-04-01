@@ -27,7 +27,7 @@ const formatTicketDateTime = (value) => {
 };
 
 export const getTicketFileName = (booking) => {
-  return `HostMyShow_Ticket_${booking?._id || booking?.booking_id || 'booking'}.pdf`;
+  return `BookMyEvent_Ticket_${booking?._id || booking?.booking_id || 'booking'}.pdf`;
 };
 
 const buildTicketDocument = ({ booking, event }) => {
@@ -45,9 +45,9 @@ const buildTicketDocument = ({ booking, event }) => {
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor('#2563eb');
-  doc.text('Host', 40, 60);
+  doc.text('Book', 40, 60);
   doc.setTextColor('#1f2937');
-  doc.text('MyShow', 100, 60);
+  doc.text('My Event', 105, 60);
 
   doc.setFontSize(20);
   doc.setTextColor('#111827');
@@ -75,7 +75,7 @@ const buildTicketDocument = ({ booking, event }) => {
 
   doc.setFontSize(13);
   doc.setTextColor('#2563eb');
-  doc.text('Enjoy your show! Please arrive 15 minutes early. For support, contact HostMyShow.', 40, y + 30);
+  doc.text('Enjoy your show! Please arrive 15 minutes early. For support, contact Book My Event.', 40, y + 30);
 
   return doc;
 };
@@ -102,7 +102,7 @@ export const shareTicketPdf = async ({ booking, event }) => {
 
   await navigator.share({
     files: [file],
-    title: 'Your HostMyShow Ticket',
+    title: 'Your Book My Event Ticket',
     text: `Here is your ticket for ${booking.event_title || event?.title || 'your event'}.`
   });
 };

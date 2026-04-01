@@ -1,5 +1,4 @@
 import Review from "../models/review.model.js";
-import { User } from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import Sentiment from "sentiment";
 
@@ -16,7 +15,6 @@ const addReview = asyncHandler(async (req, res) => {
   }
 
   const user_id = req.user.id;
-  const username = await User.findById(user_id)
 
   const result = sentiment.analyze(review);
   let sentimentCategory = "neutral";
@@ -24,13 +22,19 @@ const addReview = asyncHandler(async (req, res) => {
   if (result.score > 1) sentimentCategory = "positive";
   else if (result.score < -1) sentimentCategory = "negative";
 
-
-  const newReview = new Review({ event_id, user_id, review, sentiment: sentimentCategory , score: result.score , username });
-  await newReview.save();
+  const newReview = await Review.create({
+    event_id,
+    user_id,
+    review,
+    sentiment: sentimentCategory,
+    score: result.score,
+  });
+  await newReview.populate("user_id", "username");
 
   res.status(201).send({
     message: `Review added successfully.`,
-    success: true
+    success: true,
+    data: newReview,
   });
 });
 
@@ -44,7 +48,9 @@ const getReviews = asyncHandler(async (req, res) => {
     });
   }
 
-  const reviews = await Review.find({ event_id });
+  const reviews = await Review.find({ event_id })
+    .sort({ createdAt: -1 })
+    .populate("user_id", "username");
 
   const categorized = {
     positive: [],
@@ -66,6 +72,7 @@ const getReviews = asyncHandler(async (req, res) => {
 const getAllReviews = asyncHandler(async (req, res) => {
   const reviews = await Review.find()
     .sort({ createdAt: -1 })
+    .populate("user_id", "username")
     .limit(20);
 
   res.status(200).send({
