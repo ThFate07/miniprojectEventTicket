@@ -56,6 +56,19 @@ const ProtectedAttendeeRoute = ({ children }) => {
   return children;
 };
 
+const ProtectedAdminRoute = ({ children }) => {
+  const isAuth = userStore((state) => state.isAuth);
+  const user = userStore((state) => state.user);
+  if (!isAuth) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user?.role !== 'Admin') {
+    toast.error("This page requires an admin account.");
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
 
 const Loader = () => (
   <div className="min-h-screen flex items-center justify-center bg-transparent">
@@ -146,7 +159,7 @@ const App = () => {
             <Route path="show/:id" element={<ShowDetails />} />
             <Route path="edit-event/:id" element={<EditEvent />} />
           </Route>
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ChatBot />

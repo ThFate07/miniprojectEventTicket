@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 import { 
   Users, 
   Calendar, 
@@ -26,9 +28,15 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [groups, setGroups] = useState([]);
+  const [adminEvents, setAdminEvents] = useState([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupCode, setNewGroupCode] = useState('');
+  const [groupCodeDrafts, setGroupCodeDrafts] = useState({});
+  const [loadingAdmin, setLoadingAdmin] = useState(false);
 
   // Mock data for demonstration
-  const stats = {
+  const [stats, setStats] = useState({
     totalUsers: 12500,
     totalOrganizers: 450,
     totalAttendees: 12050,
@@ -36,8 +44,10 @@ const Dashboard = () => {
     totalRevenue: 2500000,
     activeEvents: 89,
     completedEvents: 1161,
-    pendingEvents: 12
-  };
+    pendingEvents: 12,
+    totalGroups: 0,
+    totalGroupEvents: 0,
+  });
 
   const recentUsers = [
     {
@@ -135,6 +145,74 @@ const Dashboard = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const loadAdminData = async () => {
+    setLoadingAdmin(true);
+    try {
+      const [summaryRes, groupsRes, eventsRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_API}/admin/dashboard-summary`),
+        axios.get(`${import.meta.env.VITE_API}/admin/groups`),
+        axios.get(`${import.meta.env.VITE_API}/admin/events`),
+      ]);
+
+      if (summaryRes.data?.summary) {
+        setStats((prev) => ({ ...prev, ...summaryRes.data.summary }));
+      }
+
+      setGroups(groupsRes.data?.groups || []);
+      setAdminEvents(eventsRes.data?.events || []);
+
+      const initialDrafts = {};
+      (eventsRes.data?.events || []).forEach((event) => {
+        initialDrafts[event._id] = event.groupCode || '';
+      });
+      setGroupCodeDrafts(initialDrafts);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Unable to load admin data');
+    } finally {
+      setLoadingAdmin(false);
+    }
+  };
+
+  const handleCreateGroup = async (e) => {
+    e.preventDefault();
+
+    if (!newGroupName.trim() || !newGroupCode.trim()) {
+      toast.error('Group name and code are required');
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${import.meta.env.VITE_API}/admin/groups`, {
+        name: newGroupName,
+        code: newGroupCode,
+      });
+      toast.success(response.data?.message || 'Group created');
+      setNewGroupName('');
+      setNewGroupCode('');
+      loadAdminData();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Unable to create group');
+    }
+  };
+
+  const handleSaveEventGroupCode = async (eventId) => {
+    const groupCode = (groupCodeDrafts[eventId] || '').trim();
+
+    try {
+      const response = await axios.patch(`${import.meta.env.VITE_API}/admin/events/${eventId}/group-code`, {
+        groupCode: groupCode || null,
+      });
+      toast.success(response.data?.message || 'Event updated');
+      loadAdminData();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Unable to update event group code');
+    }
+  };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'active': return 'bg-green-500';
@@ -175,7 +253,8 @@ const Dashboard = () => {
           { id: 'overview', label: 'Overview', icon: BarChart3 },
           { id: 'users', label: 'User Management', icon: Users },
           { id: 'events', label: 'Event Monitoring', icon: Calendar },
-          { id: 'analytics', label: 'Analytics', icon: TrendingUp }
+          { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+          { id: 'groups', label: 'Groups', icon: Shield },
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -277,6 +356,26 @@ const Dashboard = () => {
                 <p className="text-blue-200">Events created: <span className="text-white">+12 today</span></p>
                 <p className="text-blue-200">Revenue generated: <span className="text-white">₹125,000 today</span></p>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
+              <h3 className="text-lg font-semibold text-white mb-4">Groups</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-blue-200">Total Groups</span>
+                  <span className="font-semibold text-white">{stats.totalGroups}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-200">Group-specific Events</span>
+                  <span className="font-semibold text-white">{stats.totalGroupEvents}</span>
+                </div>
+              </div>
+            </div>
+            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
+              <h3 className="text-lg font-semibold text-white mb-4">Admin Data Status</h3>
+              <p className="text-blue-200 text-sm">{loadingAdmin ? 'Loading from server...' : 'Live admin metrics loaded from backend APIs.'}</p>
             </div>
           </div>
         </div>
@@ -493,6 +592,87 @@ const Dashboard = () => {
               <Shield className="w-12 h-12 text-purple-400 mx-auto mb-4" />
               <p className="text-2xl font-bold text-white">99.9%</p>
               <p className="text-blue-200">System Uptime</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'groups' && (
+        <div className="space-y-6">
+          <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
+            <h3 className="text-lg font-semibold text-white mb-4">Create Group</h3>
+            <form onSubmit={handleCreateGroup} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto] gap-3">
+              <input
+                type="text"
+                placeholder="Group name"
+                className="px-4 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Unique group code"
+                className="px-4 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newGroupCode}
+                onChange={(e) => setNewGroupCode(e.target.value.toUpperCase())}
+              />
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                Add Group
+              </button>
+            </form>
+          </div>
+
+          <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
+            <h3 className="text-lg font-semibold text-white mb-4">Groups List</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Members</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Group Events</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {groups.map((group) => (
+                    <tr key={group._id} className="hover:bg-gray-800/50">
+                      <td className="px-4 py-3 text-white">{group.name}</td>
+                      <td className="px-4 py-3 text-blue-200">{group.code}</td>
+                      <td className="px-4 py-3 text-white">{group.memberCount}</td>
+                      <td className="px-4 py-3 text-white">{group.groupEventCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
+            <h3 className="text-lg font-semibold text-white mb-4">Tag Events With Group Code</h3>
+            <div className="space-y-3">
+              {adminEvents.map((event) => (
+                <div key={event._id} className="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto] gap-3 items-center rounded-lg border border-white/10 p-3">
+                  <div>
+                    <p className="text-white font-medium">{event.title}</p>
+                    <p className="text-xs text-blue-200">{event.status} • {event.location}</p>
+                  </div>
+                  <input
+                    type="text"
+                    value={groupCodeDrafts[event._id] || ''}
+                    placeholder="Group code or empty"
+                    className="px-3 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setGroupCodeDrafts((prev) => ({ ...prev, [event._id]: e.target.value.toUpperCase() }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEventGroupCode(event._id)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

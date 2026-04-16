@@ -58,6 +58,9 @@ app.use("/api/review" , reviewRouter);
 import marketingRouter from "./routes/marketing.routes.js"
 app.use("/api/marketing" , marketingRouter)
 
+import adminRouter from "./routes/admin.routes.js"
+app.use("/api/admin" , adminRouter)
+
 app.get("/api/start" , (req , res) => {
     return res.status(200).send({
         message : "Server Started",

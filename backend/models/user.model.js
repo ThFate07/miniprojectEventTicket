@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema({
       ref: "Event",
     },
   ],
+  joinedGroups: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+    },
+  ],
   role: {
     type: String,
   },

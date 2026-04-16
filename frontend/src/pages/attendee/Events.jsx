@@ -6,6 +6,8 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getEventPrimaryImage } from '@/lib/eventImages';
 import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { userStore } from '@/context/userContext';
 
 // Gold glowing animation with reduced shine
 const goldGlowStyle = `
@@ -50,10 +52,10 @@ const formatDate = (date) => {
   const year = dateObj.getFullYear();
   return `${day}/${month}/${year}`;
 }
-function EventCard({ _id, title, date, category, location, image, description }) {
+function EventCard({ _id, title, date, category, location, image, description, isGroupEvent, isRegistered, ticketLink }) {
   return (
     <div
-      className="section-card min-h-[460px] overflow-hidden flex flex-col items-center relative p-4 transition-transform duration-300 hover:scale-[1.015]"
+      className={`section-card min-h-[460px] overflow-hidden flex flex-col items-center relative p-4 transition-transform duration-300 hover:scale-[1.015] ${isGroupEvent ? 'border border-yellow-300/60 animate-glow-gold' : ''}`}
     >
       <img
         src={image}
@@ -64,6 +66,8 @@ function EventCard({ _id, title, date, category, location, image, description })
         <h3 className="text-xl font-semibold text-white mb-2 text-center">{title}</h3>
         <div className="flex flex-wrap items-center gap-3 text-blue-100 text-sm mb-2 justify-center">
           <span className="bg-blue-700 text-white px-2 py-0.5 rounded-full text-xs font-medium">{category}</span>
+          {isGroupEvent && <span className="bg-yellow-500 text-black px-2 py-0.5 rounded-full text-xs font-bold">Group</span>}
+          {isRegistered && <span className="bg-emerald-500 text-black px-2 py-0.5 rounded-full text-xs font-bold">Registered</span>}
           <span>•</span>
           <span>{formatDate(date)}</span>
         </div>
@@ -73,11 +77,19 @@ function EventCard({ _id, title, date, category, location, image, description })
         <p className="text-blue-200/70 mb-4 text-center text-sm px-4">
           {description.length > 70 ? description.slice(0, 70) + '...' : description}
         </p>
-        <Link to={`/events/${_id}`}>
-          <button className="w-full bg-blue-700 hover:bg-blue-800 px-4 py-2 text-white font-medium rounded-lg shadow transition-all">
-            Book Now
-          </button>
-        </Link>
+        {isRegistered ? (
+          <Link to={ticketLink || '/my-bookings'}>
+            <button className="w-full bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-white font-medium rounded-lg shadow transition-all">
+              View Ticket
+            </button>
+          </Link>
+        ) : (
+          <Link to={`/events/${_id}`}>
+            <button className="w-full bg-blue-700 hover:bg-blue-800 px-4 py-2 text-white font-medium rounded-lg shadow transition-all">
+              Book Now
+            </button>
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -90,22 +102,52 @@ const Events = () => {
   const [showFilters, setShowFilters] = React.useState(false);
   const categories = ["All", "Hackathon", "Live Show", "Meetup", "Webinar"];
   const [events , setEvents] = useState([]);
+  const [groupCode, setGroupCode] = useState('');
+  const [joiningGroup, setJoiningGroup] = useState(false);
+  const user = userStore((state) => state.user);
 
   const fetchEvent = async () => {
       try {
+        if (user?.role === 'Attendee') {
+          const response = await axios.get(`${import.meta.env.VITE_API}/events/personalized-feed`);
+          setEvents(response.data.feed?.events || []);
+          return;
+        }
+
         const response = await axios.get(`${import.meta.env.VITE_API}/events/get-events`)
-        console.log(response.data);
         setEvents(response.data.events)
       } catch (error) {
-        console.log(error.response.data.message)
-        console.log(error)
+        console.log(error?.response?.data?.message || error.message)
       }
   }
   useEffect(() => {
     fetchEvent();
-  },[])
+  },[user?.role])
+
+  const handleJoinGroup = async (e) => {
+    e.preventDefault();
+
+    if (!groupCode.trim()) {
+      toast.error('Enter a group code');
+      return;
+    }
+
+    setJoiningGroup(true);
+    try {
+      const response = await axios.post(`${import.meta.env.VITE_API}/user/join-group`, {
+        code: groupCode,
+      });
+      toast.success(response.data.message || 'Group joined successfully');
+      setGroupCode('');
+      fetchEvent();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Unable to join group');
+    } finally {
+      setJoiningGroup(false);
+    }
+  };
+
   // Filter and search logic
-  const now = new Date();
   const filteredEvents = events?.filter((event) => {
     const matchesCategory = filter === "All" || event.eventType === filter;
     const matchesSearch = event.title.toLowerCase().includes(search.toLowerCase()) || event.description.toLowerCase().includes(search.toLowerCase());
@@ -133,6 +175,24 @@ const Events = () => {
         </div>
 
         <div className="section-card mb-8 p-4 sm:p-5">
+          {user?.role === 'Attendee' && (
+            <form onSubmit={handleJoinGroup} className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Input
+                type="text"
+                placeholder="Enter college group code"
+                value={groupCode}
+                onChange={(e) => setGroupCode(e.target.value)}
+                className="h-12 text-white border-white/40 placeholder:text-white/60"
+              />
+              <button
+                type="submit"
+                disabled={joiningGroup}
+                className="h-12 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {joiningGroup ? 'Joining...' : 'Join Group'}
+              </button>
+            </form>
+          )}
           <div className={`mobile-collapse-panel grid gap-4 ${showFilters ? 'max-h-[22rem] opacity-100' : 'max-h-0 opacity-0 sm:max-h-[22rem] sm:opacity-100'} sm:grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)]`}>
             <div className="flex flex-col">
               <label htmlFor="search" className="mb-1 text-sm font-medium text-white">Search</label>
@@ -173,8 +233,11 @@ const Events = () => {
                 date={event.eventDateTime[0]}
                 category={event.eventType}
                 location={event.location}
-                  image={getEventPrimaryImage(event)}
+                image={getEventPrimaryImage(event)}
                 description={event.description}
+                isGroupEvent={event.isGroupEvent}
+                isRegistered={event.isRegistered}
+                ticketLink={event.ticketLink}
               />
             ))
           )}

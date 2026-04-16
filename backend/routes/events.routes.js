@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { authenticate, authenticateOrganizer } from "../middlewares/auth.middleware.js";
-import { bookTicket, checkSeatsAvailability, deleteMyEvent, getBookings, getEventById, getEvents, getEventSeatsAndTimings, getMyBookings, getMyEventById, getMyEvents, postEvent, updateMyEvent , getOrganizerSummary, getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks, validateTicketEntry } from "../controllers/events.controller.js";
+import { bookTicket, checkSeatsAvailability, deleteMyEvent, getBookings, getEventById, getEvents, getEventSeatsAndTimings, getMyBookings, getMyEventById, getMyEvents, getPersonalizedFeed, postEvent, updateMyEvent , getOrganizerSummary, getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks, validateTicketEntry } from "../controllers/events.controller.js";
 import { geminiChatBot } from "../controllers/gemini.controller.js";
 
 const router = Router();
 router.get('/get-events' , authenticate , getEvents);
+router.get('/personalized-feed' , authenticate , getPersonalizedFeed);
 router.get('/get-events/:id' , authenticate , getEventById);
 router.post('/add-events' , authenticate , postEvent);
 router.get('/get-seats-times/:id' , authenticate , getEventSeatsAndTimings);

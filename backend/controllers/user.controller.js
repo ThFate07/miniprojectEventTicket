@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { Group } from "../models/group.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -115,6 +116,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id)
    .populate("eventsOrganized", "title banner  status eventDateTime")
     .populate("eventsAttended", "title banner status eventDateTime")
+        .populate("joinedGroups", "name code")
 
 
   if (!user) {
@@ -131,6 +133,65 @@ const getUserProfile = asyncHandler(async (req, res) => {
   });
 });
 
+const joinGroupByCode = asyncHandler(async (req, res) => {
+    const { code } = req.body;
+
+    if (!code || typeof code !== 'string' || !code.trim()) {
+        return res.status(400).send({
+            success: false,
+            message: "Group code is required",
+        });
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return res.status(404).send({
+            success: false,
+            message: "User not found",
+        });
+    }
+
+    const group = await Group.findOne({ code: normalizedCode });
+
+    if (!group) {
+        return res.status(404).send({
+            success: false,
+            message: "Invalid group code",
+        });
+    }
+
+    const alreadyJoined = user.joinedGroups.some(
+        (groupId) => groupId.toString() === group._id.toString()
+    );
+
+    if (alreadyJoined) {
+        return res.status(409).send({
+            success: false,
+            message: "You have already joined this group",
+        });
+    }
+
+    user.joinedGroups.push(group._id);
+    await user.save();
+
+    if (!group.members.some((memberId) => memberId.toString() === user._id.toString())) {
+        group.members.push(user._id);
+        await group.save();
+    }
+
+    return res.status(200).send({
+        success: true,
+        message: "Group joined successfully",
+        group: {
+            id: group._id,
+            name: group.name,
+            code: group.code,
+        },
+    });
+});
+
 const logout = asyncHandler(async (req ,res) => {
     res.clearCookie("token" , authCookieOptions);
     return res.status(200).send({
@@ -139,4 +200,4 @@ const logout = asyncHandler(async (req ,res) => {
     })
 })
 
-export { register, login , logout , getUserProfile };
+export { register, login , logout , getUserProfile, joinGroupByCode };

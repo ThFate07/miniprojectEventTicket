@@ -51,6 +51,12 @@ const eventSchema = new mongoose.Schema({
   special: {
     type: String,
   },
+  groupCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: null,
+  },
   totalRevenue: {
     type: Number,
     default: 0

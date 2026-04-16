@@ -111,6 +111,92 @@ const getEvents = asyncHandler(async (req, res) => {
   });
 });
 
+const getPersonalizedFeed = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const user = await User.findById(userId).populate("joinedGroups", "name code");
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  const bookings = await Booking.find({ user_id: userId }).select("event_id");
+  const registeredEventIdSet = new Set(bookings.map((booking) => booking.event_id.toString()));
+  const joinedGroupCodes = new Set(
+    (user.joinedGroups || []).map((group) => (group.code || '').toUpperCase()).filter(Boolean)
+  );
+
+  const allEvents = await Event.find({}).select(
+    "title description location eventType banner image images eventDateTime cost status groupCode"
+  );
+
+  const registeredEvents = [];
+  const groupEvents = [];
+  const recommendedEvents = [];
+
+  const registeredTypes = new Set();
+
+  allEvents.forEach((eventDoc) => {
+    const event = eventDoc.toObject();
+    const eventId = event._id.toString();
+    const normalizedGroupCode = (event.groupCode || '').toUpperCase();
+    const isRegistered = registeredEventIdSet.has(eventId);
+    const isGroupEvent = normalizedGroupCode && joinedGroupCodes.has(normalizedGroupCode);
+
+    const feedEvent = {
+      ...event,
+      isRegistered,
+      isGroupEvent,
+      ticketLink: isRegistered ? `/my-bookings?event=${eventId}` : null,
+    };
+
+    if (isRegistered) {
+      registeredEvents.push(feedEvent);
+      if (event.eventType) {
+        registeredTypes.add(event.eventType);
+      }
+    }
+
+    if (isGroupEvent) {
+      groupEvents.push({ ...feedEvent, highlight: true });
+      return;
+    }
+
+    if (!isRegistered && event.status !== 'completed') {
+      recommendedEvents.push(feedEvent);
+    }
+  });
+
+  recommendedEvents.sort((a, b) => {
+    const scoreA = registeredTypes.has(a.eventType) ? 1 : 0;
+    const scoreB = registeredTypes.has(b.eventType) ? 1 : 0;
+    return scoreB - scoreA;
+  });
+
+  const orderedEvents = [];
+  const seen = new Set();
+  [...groupEvents, ...registeredEvents, ...recommendedEvents].forEach((event) => {
+    const key = event._id.toString();
+    if (!seen.has(key)) {
+      seen.add(key);
+      orderedEvents.push(event);
+    }
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Personalized feed fetched successfully",
+    feed: {
+      recommendedEvents,
+      registeredEvents,
+      groupEvents,
+      events: orderedEvents,
+    },
+  });
+});
+
 const getEventById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const event = await Event.findById(id).select(
@@ -224,6 +310,7 @@ const postEvent = asyncHandler(async (req, res) => {
     cost,
     certificate,
     special,
+    groupCode,
   } = req.body;
 
   if (
@@ -298,6 +385,10 @@ const postEvent = asyncHandler(async (req, res) => {
     });
   }
   const user = await User.findById(req.user.id);
+  const normalizedGroupCode = typeof groupCode === 'string' && groupCode.trim()
+    ? groupCode.trim().toUpperCase()
+    : null;
+
   const event = await Event.create({
     title,
     description,
@@ -312,6 +403,7 @@ const postEvent = asyncHandler(async (req, res) => {
     cost,
     certificate,
     special,
+    groupCode: normalizedGroupCode,
     organizer: req.user.id,
   });
 
@@ -339,6 +431,12 @@ const updateMyEvent = asyncHandler(async (req, res) => {
   }
 
   const updateData = { ...req.body };
+
+  if (typeof updateData.groupCode === 'string') {
+    updateData.groupCode = updateData.groupCode.trim()
+      ? updateData.groupCode.trim().toUpperCase()
+      : null;
+  }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'images') || Object.prototype.hasOwnProperty.call(req.body, 'image')) {
     const normalizedImages = normalizeEventImages(req.body.images, req.body.image);
@@ -1052,4 +1150,4 @@ const checkSeatsAvailabilityWithLocks = asyncHandler(async (req, res) => {
   }
 });
 
-export { getEvents, getEventById, postEvent, getEventSeatsAndTimings , getMyEvents , getMyEventById , updateMyEvent , deleteMyEvent , getBookings , getMyBookings , getOrganizerSummary ,  bookTicket , validateTicketEntry, checkSeatsAvailability  , getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks};
+export { getEvents, getPersonalizedFeed, getEventById, postEvent, getEventSeatsAndTimings , getMyEvents , getMyEventById , updateMyEvent , deleteMyEvent , getBookings , getMyBookings , getOrganizerSummary ,  bookTicket , validateTicketEntry, checkSeatsAvailability  , getBookedEvents, lockSeat, unlockSeat, getSeatLocks, checkSeatsAvailabilityWithLocks};
