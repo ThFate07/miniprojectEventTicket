@@ -86,7 +86,7 @@ export const otpFormat = (username , otp) => {
             <p>If you didn't request this, please ignore this email.</p>
 
             <div class="footer">
-            &copy; 2025 Book My Event. All rights reserved.
+            &copy; 2025 Host My Show. All rights reserved.
             </div>
         </div>
         </body>
@@ -259,7 +259,7 @@ export const eventMarketingFormat = (event) => {
                 <a href="#" style="color: #ffffff; text-decoration: none; margin: 0 10px;">Instagram</a>
               </div>
               <p style="margin: 15px 0 0 0; font-size: 12px; color: #e3f2fd;">
-                &copy; ${year} Book My Event. All rights reserved.
+                &copy; ${year} Host My Show. All rights reserved.
               </p>
             </td>
           </tr>

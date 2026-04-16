@@ -12,7 +12,7 @@ const Footer = () => {
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff3dd] text-[#171717] shadow-sm">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <span className="font-display text-3xl text-[#fff8ef]">Book My Event</span>
+              <span className="font-display text-3xl text-[#fff8ef]">Host My Show</span>
             </div>
             <p className="max-w-md text-sm leading-7 text-[#c9c5bf]">
               A more polished way to launch events, sell seats, and keep attendee journeys feeling deliberate from discovery to check-in.
@@ -50,7 +50,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-8 text-sm text-[#b9b2aa]">
-          © {new Date().getFullYear()} Book My Event. All rights reserved.
+          © {new Date().getFullYear()} Host My Show. All rights reserved.
         </div>
       </div>
     </footer>

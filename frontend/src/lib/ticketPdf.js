@@ -75,7 +75,7 @@ const buildTicketDocument = ({ booking, event }) => {
 
   doc.setFontSize(13);
   doc.setTextColor('#2563eb');
-  doc.text('Enjoy your show! Please arrive 15 minutes early. For support, contact Book My Event.', 40, y + 30);
+  doc.text('Enjoy your show! Please arrive 15 minutes early. For support, contact Host My Show.', 40, y + 30);
 
   return doc;
 };
@@ -102,7 +102,7 @@ export const shareTicketPdf = async ({ booking, event }) => {
 
   await navigator.share({
     files: [file],
-    title: 'Your Book My Event Ticket',
+    title: 'Your Host My Show Ticket',
     text: `Here is your ticket for ${booking.event_title || event?.title || 'your event'}.`
   });
 };

@@ -1,5 +1,6 @@
 {
-  "name": "book-my-event-backend",
+  "name": "host-my-show-backend",
+  "displayName": "Host My Show (Backend)",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",

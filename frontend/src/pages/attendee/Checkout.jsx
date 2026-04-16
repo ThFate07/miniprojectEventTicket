@@ -57,7 +57,7 @@ const Checkout = () => {
       key: import.meta.env.VITE_RAZORPAY_KEY,
       amount: data.amount,
       currency: data.currency,
-      name: "Book My Event",
+      name: "Host My Show",
       description: "Test Mode",
       order_id: data.id,
       handler: async (response) => {

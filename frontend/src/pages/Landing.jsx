@@ -142,7 +142,7 @@ const Landing = () => {
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-8 text-[#d1d5db] sm:text-lg">
-                  Book My Event brings event creation, bookings, ticketing, reviews, and attendee communication into one
+                  Host My Show brings event creation, bookings, ticketing, reviews, and attendee communication into one
                   polished flow that feels modern on both sides of the stage.
                 </p>
 
@@ -411,7 +411,7 @@ const Landing = () => {
                       <p className="font-semibold text-[#171717]">
                         {testimonials[currentTestimonial]?.user_id?.username || "Anonymous"}
                       </p>
-                      <p className="text-sm text-[#6b7280]">Verified Book My Event user</p>
+                      <p className="text-sm text-[#6b7280]">Verified Host My Show user</p>
                     </div>
                   </div>
 

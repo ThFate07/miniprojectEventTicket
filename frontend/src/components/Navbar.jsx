@@ -72,7 +72,7 @@ const Navbar = () => {
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fff3dd] text-lg font-bold text-[#171717] shadow-sm">
               B
             </span>
-            <span className="font-display text-2xl text-[#fff8ef]">Book My Event</span>
+            <span className="font-display text-2xl text-[#fff8ef]">Host My Show</span>
           </Link>
         </div>
 
