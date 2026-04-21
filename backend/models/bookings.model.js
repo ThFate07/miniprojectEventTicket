@@ -41,13 +41,28 @@ const bookingSchema = new mongoose.Schema({
     enum: ['upcoming', 'active', 'completed'],
     default: 'upcoming'
   },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    default: null
+  },
+  departmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null
+  },
+  committeeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Committee',
+    default: null
+  },
   payment_id: {
     type: String,
-    required: true
+    default: 'FREE'
   },
   paymentAmt: {
     type: Number,
-    required: true
+    default: 0
   }
 }, { timestamps: true });
 

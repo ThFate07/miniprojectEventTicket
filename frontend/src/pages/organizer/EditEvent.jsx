@@ -18,12 +18,14 @@ import { getEventImages } from '@/lib/eventImages';
 
 const eventTypes = ['Hackathon', 'Live Show'];
 const totalSteps = 4;
+const visibilityOptions = ['department', 'college', 'global'];
 
 const getTrimmedImages = (images) => images.map((image) => image.trim()).filter(Boolean);
 
 const EditEvent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [bootstrap, setBootstrap] = useState({ committees: [], departments: [] });
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -31,20 +33,35 @@ const EditEvent = () => {
     description: '',
     location: '',
     type: eventTypes[0],
+    committeeId: '',
+    departmentIds: [],
+    visibilityScope: 'department',
     times: [''],
     date: '',
+    tentativeDate: '',
+    finalDate: '',
+    isFinalized: false,
+    lifecycleState: 'tentative',
     banner: '',
     images: [''],
     certificate: false,
     personalized: false,
     cost: '',
+    maxTicketsPerStudent: '1',
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API}/events/get-my-events/${id}`, { withCredentials: true });
+        const [bootstrapRes, res] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API}/user/bootstrap`, { withCredentials: true }),
+          axios.get(`${import.meta.env.VITE_API}/events/get-my-events/${id}`, { withCredentials: true }),
+        ]);
+        setBootstrap({
+          committees: bootstrapRes.data.committees || [],
+          departments: bootstrapRes.data.departments || [],
+        });
         const eventData = res.data.event;
         if (eventData) {
           const eventDate = eventData.eventDateTime.length > 0 ? new Date(eventData.eventDateTime[0]).toISOString().split('T')[0] : '';
@@ -54,13 +71,21 @@ const EditEvent = () => {
             description: eventData.description,
             location: eventData.location,
             type: eventData.eventType,
+            committeeId: eventData.committeeId?._id || eventData.committeeId || '',
+            departmentIds: (eventData.departmentIds || []).map((department) => department._id || department),
+            visibilityScope: eventData.visibilityScope || 'department',
             times: formattedTimes.length > 0 ? formattedTimes : [''],
             date: eventDate,
+            tentativeDate: eventData.tentativeDate ? new Date(eventData.tentativeDate).toISOString().split('T')[0] : eventDate,
+            finalDate: eventData.finalDate ? new Date(eventData.finalDate).toISOString().split('T')[0] : '',
+            isFinalized: Boolean(eventData.isFinalized),
+            lifecycleState: eventData.lifecycleState || 'tentative',
             banner: eventData.banner,
             images: getEventImages(eventData).length > 0 ? getEventImages(eventData) : [''],
             certificate: eventData.certificate || false,
             personalized: eventData.special === 'personalized',
             cost: eventData.cost,
+            maxTicketsPerStudent: String(eventData.maxTicketsPerStudent || 1),
           });
         }
         setLoading(false);
@@ -84,6 +109,15 @@ const EditEvent = () => {
 
   const handleSelectType = (value) => {
     setForm((prev) => ({ ...prev, type: value }));
+  };
+
+  const handleDepartmentToggle = (departmentId) => {
+    setForm((prev) => ({
+      ...prev,
+      departmentIds: prev.departmentIds.includes(departmentId)
+        ? prev.departmentIds.filter((id) => id !== departmentId)
+        : [...prev.departmentIds, departmentId],
+    }));
   };
 
   const handleImageChange = (idx, value) => {
@@ -145,6 +179,14 @@ const EditEvent = () => {
       toast.error('Banner image link is required');
       return;
     }
+    if (!form.committeeId) {
+      toast.error('Committee is required');
+      return;
+    }
+    if (form.departmentIds.length === 0) {
+      toast.error('Select at least one department');
+      return;
+    }
     const images = getTrimmedImages(form.images);
 
     if (images.length === 0) {
@@ -155,12 +197,24 @@ const EditEvent = () => {
       toast.error('Valid ticket cost is required');
       return;
     }
+    if (!form.maxTicketsPerStudent || isNaN(form.maxTicketsPerStudent) || Number(form.maxTicketsPerStudent) < 1) {
+      toast.error('Each student ticket limit must be at least 1');
+      return;
+    }
     if (!form.date) {
       toast.error('Event date is required');
       return;
     }
+    if (!form.tentativeDate) {
+      toast.error('Tentative date is required');
+      return;
+    }
     if (form.times.some(time => !time)) {
       toast.error('All event timings must be filled');
+      return;
+    }
+    if (form.isFinalized && !form.finalDate) {
+      toast.error('Final date is required before finalizing');
       return;
     }
     
@@ -177,11 +231,19 @@ const EditEvent = () => {
       description: form.description,
       location: form.location,
       eventType: form.type,
+      committeeId: form.committeeId,
+      departmentIds: form.departmentIds,
+      visibilityScope: form.visibilityScope,
+      tentativeDate: new Date(`${form.tentativeDate}T09:00:00`).toISOString(),
+      finalDate: form.finalDate ? new Date(`${form.finalDate}T09:00:00`).toISOString() : null,
+      isFinalized: form.isFinalized,
+      lifecycleState: form.isFinalized ? 'registration_open' : 'tentative',
       banner: form.banner,
       image: images[0],
       images,
       eventDateTime,
       cost: Number(form.cost),
+      maxTicketsPerStudent: Number(form.maxTicketsPerStudent),
       certificate: form.certificate,
       special: form.personalized ? 'personalized' : undefined,
     };
@@ -206,8 +268,11 @@ const EditEvent = () => {
   return (
     <div className="mx-auto w-full max-w-5xl text-white">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
-        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Edit Event</h1>
+        <p className="campus-label">Committee Planning</p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Refine Event Plan</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/75">
+          Update visibility, confirm the final date, and move the event from planning mode into active registration when ready.
+        </p>
       </div>
       {/* Improved Progress Bar with Step Indicators */}
       <div className="mb-8">
@@ -275,6 +340,48 @@ const EditEvent = () => {
               </Select>
             </div>
             <div>
+              <label className="block mb-1 font-semibold text-xl">Committee</label>
+              <Select value={form.committeeId} onValueChange={(value) => handleChange({ target: { name: 'committeeId', value } })}>
+                <SelectTrigger className="h-10 border-white/30">
+                  <SelectValue placeholder="Select committee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bootstrap.committees.map((committee) => (
+                    <SelectItem key={committee._id} value={committee._id}>
+                      {committee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block mb-2 font-semibold text-xl">Audience Departments</label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {bootstrap.departments.map((department) => (
+                  <label key={department._id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    <Checkbox
+                      checked={form.departmentIds.includes(department._id)}
+                      onCheckedChange={() => handleDepartmentToggle(department._id)}
+                    />
+                    <span>{department.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1 font-semibold text-xl">Visibility Scope</label>
+              <Select value={form.visibilityScope} onValueChange={(value) => handleChange({ target: { name: 'visibilityScope', value } })}>
+                <SelectTrigger className="h-10 border-white/30">
+                  <SelectValue placeholder="Select visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visibilityOptions.map((scope) => (
+                    <SelectItem key={scope} value={scope}>{scope}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <label className="block mb-1 font-semibold text-xl">Banner Image Link</label>
               <Input className="h-10 border-white/30" placeholder="e.g https://..." name="banner" value={form.banner} onChange={handleChange} required />
             </div>
@@ -320,6 +427,22 @@ const EditEvent = () => {
           <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <label className="block mb-1 font-semibold text-xl">Event Date</label>
             <Input type="date" className="h-10 border-white/30" name="date" value={form.date} onChange={handleChange} required />
+            <label className="block mb-1 font-semibold text-xl">Tentative Planning Date</label>
+            <Input type="date" className="h-10 border-white/30" name="tentativeDate" value={form.tentativeDate} onChange={handleChange} required />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isFinalized"
+                checked={form.isFinalized}
+                onCheckedChange={(val) => setForm((prev) => ({ ...prev, isFinalized: Boolean(val) }))}
+              />
+              <label htmlFor="isFinalized" className="text-lg">Finalize event and open registration</label>
+            </div>
+            {form.isFinalized && (
+              <>
+                <label className="block mb-1 font-semibold text-xl">Final Date</label>
+                <Input type="date" className="h-10 border-white/30" name="finalDate" value={form.finalDate} onChange={handleChange} required />
+              </>
+            )}
             <label className="block mb-1 font-semibold text-xl">Event Timings</label>
             {form.times.map((time, idx) => (
               <div key={idx} className="mb-2 flex flex-col gap-2 sm:flex-row">
@@ -354,6 +477,20 @@ const EditEvent = () => {
 
             <label className="block mb-1 font-semibold text-xl mt-4">Cost of Ticket (₹)</label>
             <Input className="h-10 border-white/30" placeholder="e.g 500" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <label className="block mb-1 font-semibold text-xl mt-4">Max tickets per student</label>
+            <Input
+              className="h-10 border-white/30"
+              placeholder="e.g 2"
+              name="maxTicketsPerStudent"
+              value={form.maxTicketsPerStudent}
+              onChange={handleChange}
+              type="number"
+              min="1"
+              required
+            />
+            <p className="text-sm text-blue-200/70">
+              Students cannot exceed this limit even across multiple bookings for the same event.
+            </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Button type="button" variant="secondary" className="bg-gray-700 hover:bg-gray-800 text-white" onClick={back}>Back</Button>
               <Button type="button" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={next}>Next</Button>
@@ -386,9 +523,16 @@ const EditEvent = () => {
               <p><span className="font-semibold">Description:</span> {form.description}</p>
               <p><span className="font-semibold">Location:</span> {form.location}</p>
               <p><span className="font-semibold">Type:</span> {form.type}</p>
+              <p><span className="font-semibold">Committee:</span> {bootstrap.committees.find((committee) => committee._id === form.committeeId)?.name || 'Not selected'}</p>
+              <p><span className="font-semibold">Departments:</span> {bootstrap.departments.filter((department) => form.departmentIds.includes(department._id)).map((department) => department.name).join(', ')}</p>
+              <p><span className="font-semibold">Visibility:</span> {form.visibilityScope}</p>
               <p><span className="font-semibold">Banner:</span> {form.banner}</p>
               <p><span className="font-semibold">Gallery Images:</span> {getTrimmedImages(form.images).join(', ')}</p>
               <p><span className="font-semibold">Timings:</span> {form.times.join(', ')}</p>
+              <p><span className="font-semibold">Tentative Date:</span> {form.tentativeDate}</p>
+              <p><span className="font-semibold">Final Date:</span> {form.finalDate || 'Not finalized yet'}</p>
+              <p><span className="font-semibold">Lifecycle:</span> {form.isFinalized ? 'registration_open' : 'tentative'}</p>
+              <p><span className="font-semibold">Per-student ticket cap:</span> {form.maxTicketsPerStudent}</p>
               
               {/* --- MODIFICATION START: Hiding Seating Info --- */}
               {/* <p><span className="font-semibold">Seating:</span> {form.seatMode === 'rows-cols' ? `${form.rows} rows x ${form.cols} columns` : `${form.seats} seats`}</p> */}

@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, School, X } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 
 import { userStore } from "@/context/userContext";
+import { isOrganizerRole, isPrivilegedRole } from "@/lib/auth";
 
 import { Button } from "./ui/button";
 
@@ -17,18 +18,20 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const organizer = isOrganizerRole(user?.role);
+  const admin = isPrivilegedRole(user?.role);
 
   const navLinks = [
-    { to: user?.role === "Organizer" ? "/organizer/dashboard" : "/", label: user?.role === "Organizer" ? "Organizer Dashboard" : "Home" },
+    { to: admin ? "/admin" : organizer ? "/organizer/dashboard" : "/", label: admin ? "Admin Console" : organizer ? "Dashboard" : "Campus Home" },
     { to: "/events", label: "Events" },
   ];
 
-  if (!isAuth || user?.role === "Attendee") {
-    navLinks.push({ to: "/my-bookings", label: "Bookings" });
+  if (isAuth) {
+    navLinks.push({ to: "/my-bookings", label: "Event Bookings" });
   }
 
-  if (isAuth && user?.role === "Organizer") {
-    navLinks.push({ to: "/organizer/list-bookings", label: "Event Bookings" });
+  if (isAuth && user?.hasTenantAccess === false) {
+    navLinks.push({ to: "/profile", label: "Join College" });
   }
 
   const handleLogout = async () => {
@@ -65,14 +68,17 @@ const Navbar = () => {
   }, [location.pathname]);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#120f0d]/72 backdrop-blur-xl">
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#120f0d]/94">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fff3dd] text-lg font-bold text-[#171717] shadow-sm">
-              B
+              <School className="h-5 w-5" />
             </span>
-            <span className="font-display text-2xl text-[#fff8ef]">Host My Show</span>
+            <div className="flex flex-col">
+              <span className="font-display text-2xl leading-none text-[#fff8ef]">Book My Event</span>
+              <span className="mt-1 text-[10px] uppercase tracking-[0.3em] text-[#d6d3d1]">College Events OS</span>
+            </div>
           </Link>
         </div>
 
@@ -111,9 +117,14 @@ const Navbar = () => {
               </button>
 
               {showDropdown && (
-                <div className="absolute right-0 z-50 mt-5 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#171717]/95 text-white shadow-2xl backdrop-blur-xl">
+                <div className="absolute right-0 z-50 mt-5 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#171717] text-white shadow-2xl">
                   <div className="border-b border-white/10 px-4 py-3 text-sm text-[#d6d3d1]">
                     Hello, <span className="font-semibold">{user?.username}</span>
+                    {(user?.collegeId?.name || user?.college?.name) && (
+                      <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#f4d58d]">
+                        {user?.collegeId?.name || user?.college?.name}
+                      </div>
+                    )}
                   </div>
                   <Link
                     to="/profile"

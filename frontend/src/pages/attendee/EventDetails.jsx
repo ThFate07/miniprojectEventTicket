@@ -1,103 +1,104 @@
-import React from 'react'
-import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog';
-import { useState } from 'react';
-import { useRef } from 'react';
-import { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { Link, useParams } from 'react-router-dom';
 import { userStore } from '@/context/userContext';
 import { getEventImages, getEventPrimaryImage } from '@/lib/eventImages';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Play, Ticket, Users } from 'lucide-react';
+import { canRegisterForEvent } from '@/lib/auth';
+import { formatEventDate, formatEventSchedule } from '@/lib/utils';
 
 const EventDetails = () => {
-  // Example event/movie data
-  const [event , setEvent] = useState({});
+  const [event, setEvent] = useState({});
   const [selectedImage, setSelectedImage] = useState('');
-  const {id} = useParams();
+  const [open, setOpen] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [newReview, setNewReview] = useState('');
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const { id } = useParams();
+  const videoRef = useRef(null);
+  const user = userStore((state) => state.user);
+
+  const eventImages = getEventImages(event);
+  const canRegister = Boolean(
+    event?.isFinalized &&
+    event?.lifecycleState === 'registration_open' &&
+    canRegisterForEvent(user, event) &&
+    Number(event?.remainingTicketsForCurrentUser ?? event?.maxTicketsPerStudent ?? 1) > 0
+  );
+  const primaryDate = event.eventDateTime?.[0] || event.tentativeDate || event.finalDate;
+  const scheduleLabel = formatEventSchedule({ date: primaryDate, isFinalized: event.isFinalized, includeTime: event.isFinalized });
+
   const fetchEvent = async () => {
-    console.log(id);
     try {
       const response = await axios.get(`${import.meta.env.VITE_API}/events/get-events/${id}`);
-      console.log(response.data)
       setEvent(response.data.event);
     } catch (error) {
-      console.log(error)
+      console.error('Error fetching event details', error);
+      toast.error(error.response?.data?.message || 'Unable to load this event right now.');
     }
-  }
+  };
 
-  const [open, setOpen] = useState(false);
-  const videoRef = useRef(null);
+  const fetchReviews = async () => {
+    try {
+      setLoadingReviews(true);
+      const res = await axios.get(`${import.meta.env.VITE_API}/review/getreviews/${id}`);
+      const positiveReviews = res.data.data.positive || [];
+      const neutralReviews = res.data.data.neutral || [];
+      const negativeReviews = res.data.data.negative || [];
+      const mergedReviews = [...positiveReviews, ...neutralReviews, ...negativeReviews].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setReviews(mergedReviews);
+    } catch (err) {
+      console.error("Error fetching reviews", err);
+      toast.error(err.response?.data?.message || 'Unable to load reviews right now.');
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
-  const [reviews, setReviews] = useState([]);
-const [newReview, setNewReview] = useState('');
-const [loadingReviews, setLoadingReviews] = useState(false);
+  const submitReview = async () => {
+    if (!newReview.trim()) {
+      toast.error('Write a review before posting.');
+      return;
+    }
 
-// Replace this with real user ID (from auth)
-const user = userStore((state) => state.user);
-console.log(user)
-const eventImages = getEventImages(event);
+    try {
+      await axios.post(`${import.meta.env.VITE_API}/review/addreview`, {
+        event_id: id,
+        review: newReview,
+      });
+      setNewReview('');
+      toast.success('Review posted successfully.');
+      fetchReviews();
+    } catch (err) {
+      console.error("Error submitting review", err);
+      toast.error(err.response?.data?.message || 'Unable to submit your review.');
+    }
+  };
 
-const showPreviousImage = () => {
-  if (eventImages.length <= 1) {
-    return;
-  }
+  const showPreviousImage = () => {
+    if (eventImages.length <= 1) return;
+    const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
+    const previousIndex = (currentIndex - 1 + eventImages.length) % eventImages.length;
+    setSelectedImage(eventImages[previousIndex]);
+  };
 
-  const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
-  const previousIndex = (currentIndex - 1 + eventImages.length) % eventImages.length;
-  setSelectedImage(eventImages[previousIndex]);
-};
+  const showNextImage = () => {
+    if (eventImages.length <= 1) return;
+    const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
+    const nextIndex = (currentIndex + 1) % eventImages.length;
+    setSelectedImage(eventImages[nextIndex]);
+  };
 
-const showNextImage = () => {
-  if (eventImages.length <= 1) {
-    return;
-  }
-
-  const currentIndex = Math.max(eventImages.indexOf(selectedImage), 0);
-  const nextIndex = (currentIndex + 1) % eventImages.length;
-  setSelectedImage(eventImages[nextIndex]);
-};
-
-// Fetch reviews
-const fetchReviews = async () => {
-  try {
-    setLoadingReviews(true);
-    const res = await axios.get(`${import.meta.env.VITE_API}/review/getreviews/${id}`);
-    const positiveReviews = res.data.data.positive || [];
-    const neutralReviews = res.data.data.neutral || [];
-    const negativeReviews = res.data.data.negative || [];
-    const mergedReviews = [...positiveReviews, ...neutralReviews, ...negativeReviews].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    setReviews(mergedReviews);
-  } catch (err) {
-    console.error("Error fetching reviews", err);
-  } finally {
-    setLoadingReviews(false);
-  }
-};
-
-// Submit review
-const submitReview = async () => {
-  if (!newReview.trim()) return;
-
-  try {
-    await axios.post(`${import.meta.env.VITE_API}/review/addreview`, {
-      event_id: id,
-      review: newReview,
-    });
-    setNewReview('');
-    fetchReviews(); // refresh list
-  } catch (err) {
-    console.error("Error submitting review", err);
-  }
-};
-
-
-  // Reset video when dialog closes
-  useEffect(()=> {
+  useEffect(() => {
     fetchEvent();
     fetchReviews();
-  },[])
+  }, []);
 
   useEffect(() => {
     setSelectedImage(getEventPrimaryImage(event));
@@ -110,161 +111,244 @@ const submitReview = async () => {
   }, [open]);
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
-      {/* Banner background */}
-      <div
-        className="absolute inset-0 z-0 bg-black/90"
-        style={{
-          backgroundImage: `url(${event.banner})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(4px) brightness(1)',
-        }}
-      />
-      <div className="absolute inset-0 bg-black/70 z-10" />
-      {/* Main content */}
-      <div className="app-page relative z-20 my-8 flex w-full max-w-6xl flex-col gap-8 py-8 md:my-10 md:flex-row md:items-start lg:gap-10 lg:py-12">
-        {/* Poster */}
-        <div className="w-full md:w-1/2 flex-shrink-0 space-y-4">
-          <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-black/20 shadow-4xl">
+    <div className="app-page space-y-8 py-8 sm:py-10">
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="section-card overflow-hidden p-4 sm:p-5">
+          <div className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#0f1116]">
             <img
               src={selectedImage || event.banner}
               alt={event.title}
-              className="w-full max-h-[32rem] object-cover object-center transition-all duration-300"
+              className="h-[300px] w-full object-cover object-center sm:h-[380px] lg:h-[460px]"
             />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-5 py-5">
+              <p className="text-xs uppercase tracking-[0.24em] text-[#f4d58d]">
+                {event.isFinalized ? 'Finalized event' : 'Upcoming plan'}
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">{event.title}</h1>
+            </div>
           </div>
-          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-blue-100/80">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+
+          {eventImages.length > 1 && (
+            <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"
                 onClick={showPreviousImage}
-                disabled={eventImages.length <= 1}
-                className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white transition hover:bg-white/10"
                 aria-label="Show previous event image"
               >
                 <ChevronLeft className="h-5 w-5" />
-                <span>Prev</span>
               </button>
-              <span className="text-center text-xs uppercase tracking-[0.3em] text-blue-200/70">
-                {eventImages.length > 0 ? `${Math.max(eventImages.indexOf(selectedImage), 0) + 1} / ${eventImages.length}` : '0 / 0'}
-              </span>
-              <button
-                type="button"
-                onClick={showNextImage}
-                disabled={eventImages.length <= 1}
-                className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Show next event image"
-              >
-                <span>Next</span>
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
-            {eventImages.length > 0 && (
-              <div className="flex items-center justify-center gap-2">
+              <div className="grid flex-1 grid-cols-4 gap-2 sm:grid-cols-5">
                 {eventImages.map((image, index) => (
                   <button
                     key={`${image}-${index}`}
                     type="button"
                     onClick={() => setSelectedImage(image)}
+                    className={`overflow-hidden rounded-2xl border transition ${selectedImage === image ? 'border-[#f4d58d]' : 'border-white/10 hover:border-white/25'}`}
                     aria-label={`Show event image ${index + 1}`}
-                    className={`h-2.5 w-8 rounded-full transition-all ${selectedImage === image ? 'bg-white' : 'bg-white/25 hover:bg-white/55'}`}
-                  />
+                  >
+                    <img src={image} alt={`${event.title} ${index + 1}`} className="h-16 w-full object-cover" />
+                  </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={showNextImage}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white transition hover:bg-white/10"
+                aria-label="Show next event image"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-5">
+          <div className="section-card p-5 sm:p-6">
+            <div className="mb-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-[#f4d58d] px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-950">
+                {event.isFinalized ? 'Confirmed' : 'Approximate'}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.22em] text-blue-100">
+                {event.lifecycleState || event.status || 'tentative'}
+              </span>
+              {event.visibilityScope && (
+                <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.22em] text-blue-100">
+                  {event.visibilityScope} audience
+                </span>
+              )}
+            </div>
+
+            <p className="text-base leading-7 text-blue-100/82">
+              {event.description || 'More details will be shared by the organizing committee soon.'}
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="h-5 w-5 text-[#f4d58d]" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-blue-100/55">Schedule</p>
+                    <p className="mt-1 font-medium text-white">{scheduleLabel}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-[#2cc4b0]" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-blue-100/55">Location</p>
+                    <p className="mt-1 font-medium text-white">{event.location || 'Venue to be confirmed'}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                <div className="flex items-center gap-3">
+                  <Ticket className="h-5 w-5 text-[#65c9ff]" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-blue-100/55">Access</p>
+                    <p className="mt-1 font-medium text-white">
+                      {Number(event.cost || 0) > 0 ? `₹${event.cost} per ticket` : 'Free registration'}
+                    </p>
+                    <p className="mt-1 text-sm text-blue-200/75">
+                      Max {event.maxTicketsPerStudent || 1} ticket{Number(event.maxTicketsPerStudent || 1) > 1 ? 's' : ''} per student
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-[#f07c52]" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-blue-100/55">Hosted by</p>
+                    <p className="mt-1 font-medium text-white">{event.committeeId?.name || event.organizerId?.username || 'Campus organizer'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {Array.isArray(event.eventDateTime) && event.eventDateTime.length > 1 && event.isFinalized && (
+              <div className="mt-5 rounded-[1.4rem] border border-white/10 bg-[#0f141d] p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-blue-100/55">All showtimes</p>
+                <div className="mt-3 space-y-2">
+                  {event.eventDateTime.map((date, index) => (
+                    <div key={`${date}-${index}`} className="flex items-center gap-3 text-sm text-blue-100">
+                      <Clock3 className="h-4 w-4 text-[#f4d58d]" />
+                      <span>{formatEventDate(date, { includeTime: true, dateStyle: 'long' })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            <div className="text-center text-blue-200/75">
-              {eventImages.length > 1 ? 'Use Prev and Next to browse all event images.' : 'Only one event image is available for this event.'}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              {event.trailer && (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      <Play className="h-4 w-4" />
+                      Watch trailer
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-full max-w-5xl overflow-hidden border-white/10 bg-[#090b10] p-0">
+                    <div className="w-full" style={{ aspectRatio: '16/9' }}>
+                      <video
+                        ref={videoRef}
+                        width="100%"
+                        height="100%"
+                        controls
+                        autoPlay
+                        onEnded={() => setOpen(false)}
+                        className="h-full w-full bg-black"
+                      >
+                        <source src={event.trailer} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+              <Link to={canRegister ? `/seats/${id}` : '#'} className="w-full sm:w-auto">
+                <Button
+                  disabled={!canRegister}
+                  className="w-full sm:w-auto"
+                >
+                  {canRegister ? (Number(event.cost || 0) > 0 ? 'Buy tickets' : 'Register now') : 'Planning stage'}
+                </Button>
+              </Link>
+            </div>
+
+            {!canRegister && (
+              <p className="mt-4 text-sm text-amber-300">
+                {event?.isFinalized && event?.lifecycleState === 'registration_open'
+                  ? 'Join your college workspace and matching audience scope to register for this event.'
+                  : 'Registration opens after the event is finalized and moved to the registration stage.'}
+              </p>
+            )}
+            {canRegister && event.remainingTicketsForCurrentUser === 0 && (
+              <p className="mt-4 text-sm text-amber-300">
+                You have already reached the student ticket limit for this event.
+              </p>
+            )}
+          </div>
+
+          <div className="section-card p-5 sm:p-6">
+            <p className="campus-label">Quick read</p>
+            <div className="mt-4 space-y-3 text-sm leading-7 text-blue-100/80">
+              <p>Upcoming events show an approximate date until the organizing team locks the final schedule.</p>
+              <p>Once finalized, this page updates with the exact date, registration state, and booking flow.</p>
             </div>
           </div>
         </div>
-        {/* Details */}
-        <div className="flex-1 flex flex-col items-center text-center md:items-start md:text-left">
-          <span className="uppercase text-blue-400 font-semibold tracking-widest mb-2">{event.status}</span>
-          <h1 className="text-3xl font-bold text-white mb-2 sm:text-4xl md:text-5xl">{event.title}</h1>
-          <p className="text-blue-100 mb-6 max-w-2xl">{event.description}</p>
-          {eventImages.length > 1 && (
-            <p className="text-sm text-blue-200/80 mb-4">{eventImages.length} event photos available</p>
-          )}
-          <div className="text-blue-200 font-medium mb-8">
-          {event.eventDateTime && event.eventDateTime.map((date, index)  => (
-            <span key={index}>
-                {new Date(date).toLocaleString("en-IN", {
-                dateStyle: "long",
-                timeStyle: "short",
-                timeZone: "Asia/Kolkata",
-                })}
-                {index < event.eventDateTime.length - 1 && <>, </>}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="section-card p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="campus-label">Reviews</p>
+              <h2 className="mt-2 text-2xl font-bold text-white">What people are saying</h2>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-sm text-blue-100">
+              {reviews.length} posts
             </span>
-            ))}
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center md:justify-start">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <button className="w-full rounded-lg bg-blue-900 px-6 py-3 font-semibold text-white shadow transition-colors hover:bg-blue-800 sm:w-auto">Watch Trailer</button>
-              </DialogTrigger>
-              <DialogContent className="bg-black max-w-4xl w-full flex flex-col items-center p-0 overflow-hidden">
-                <div className="w-full" style={{ aspectRatio: '16/7' }}>
-                  <video
-                    ref={videoRef}
-                    width="100%"
-                    height="100%"
-                    controls
-                    autoPlay
-                    onEnded={() => setOpen(false)}
-                    className="w-full h-full rounded-t-lg bg-black"
-                  >
-                    <source src={event.trailer} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
+
+          <div className="mt-5 space-y-4">
+            <Textarea
+              value={newReview}
+              onChange={(e) => setNewReview(e.target.value)}
+              placeholder="Share a quick thought about this event..."
+            />
+            <div className="flex justify-end">
+              <Button onClick={submitReview}>Post review</Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="section-card p-5 sm:p-6">
+          <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
+            {loadingReviews ? (
+              <p className="text-blue-300">Loading reviews...</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-blue-300">No reviews yet. Be the first to add one.</p>
+            ) : (
+              reviews.map((review) => (
+                <div key={review._id} className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-semibold text-[#f4d58d]">{review?.user_id?.username || 'Anonymous'}</span>
+                    <span className="text-xs uppercase tracking-[0.18em] text-blue-100/45">
+                      {formatEventDate(review.createdAt, { includeTime: false, dateStyle: 'medium' })}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-7 text-blue-100/88">{review.review}</p>
                 </div>
-              </DialogContent>
-            </Dialog>
-            <Link to={`/seats/${id}`} className="w-full sm:w-auto"><button className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow transition-colors hover:bg-blue-700">Buy Tickets</button></Link>
-            <button className="flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-3 font-semibold text-white shadow transition-colors hover:bg-white/20 sm:w-auto"><span className="text-xl">♡</span></button>
+              ))
+            )}
           </div>
         </div>
-      </div>
-      {/* Reviews Section */}
-      <div className="app-page relative z-20 w-full max-w-4xl py-4 sm:py-8">
-        <h2 className="text-2xl font-bold text-white mb-4">Reviews</h2>
-
-        {/* Add New Review */}
-        <div className="bg-white/5 p-4 rounded-lg border border-white/10 mb-6">
-          <textarea
-            value={newReview}
-            onChange={(e) => setNewReview(e.target.value)}
-            placeholder="Add a public comment..."
-            className="w-full p-3 bg-black/30 text-white rounded-lg border border-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-            rows={3}
-          />
-          <div className="mt-2 flex justify-end">
-            <button
-              onClick={submitReview}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow transition-all"
-            >
-              Post
-            </button>
-          </div>
-          <div className="space-y-4 max-h-[300px] mt-4 overflow-y-auto pr-2">
-          {loadingReviews ? (
-            <p className="text-blue-300">Loading reviews...</p>
-          ) : reviews.length === 0 ? (
-            <p className="text-blue-300">No reviews yet. Be the first to add one!</p>
-          ) : (
-            reviews.map((review, index) => (
-              <div key={review?._id || index} className="bg-white/5 p-3 rounded-lg border border-white/10">
-                <span className="text-lg text-blue-400 mt-1 block">{review?.user_id?.username || 'Anonymous'}</span>
-                <p className="text-blue-100 text-sm mt-1">{review.review}</p>
-              </div>
-            ))
-          )}
-        </div>
-        </div>
-
-        {/* Review List */}
-        
-      </div>
-
+      </section>
     </div>
   )
 }

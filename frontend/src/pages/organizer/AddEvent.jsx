@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -18,18 +17,24 @@ import { useNavigate } from 'react-router-dom';
 const eventTypes = ['Hackathon', 'Live Show'];
 const totalSteps = 4;
 const ticketingModes = ['assigned', 'general'];
+const visibilityOptions = ['department', 'college', 'global'];
 
 const getTrimmedImages = (images) => images.map((image) => image.trim()).filter(Boolean);
 
 const AddEvent = () => {
   const [step, setStep] = useState(1);
+  const [bootstrap, setBootstrap] = useState({ committees: [], departments: [], user: null });
   const [form, setForm] = useState({
     title: '',
     description: '',
     location: '',
     type: eventTypes[0],
+    committeeId: '',
+    departmentIds: [],
+    visibilityScope: 'department',
     times: [''],
     date: '',
+    tentativeDate: '',
     banner: '',
     images: [''],
     certificate: false,
@@ -41,8 +46,29 @@ const AddEvent = () => {
     seats: '',
     capacity: '',
     cost: '',
+    maxTicketsPerStudent: '1',
   });
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const fetchBootstrap = async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_API}/user/bootstrap`, { withCredentials: true });
+        const committees = res.data.committees || [];
+        const departments = res.data.departments || [];
+        setBootstrap({ committees, departments, user: res.data.user });
+        setForm((prev) => ({
+          ...prev,
+          committeeId: prev.committeeId || committees[0]?._id || '',
+          departmentIds: prev.departmentIds.length > 0 ? prev.departmentIds : departments.slice(0, 1).map((department) => department._id),
+        }));
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Failed to load organizer context');
+      }
+    };
+
+    fetchBootstrap();
+  }, []);
 
   // Handlers
   const handleChange = (e) => {
@@ -55,6 +81,15 @@ const AddEvent = () => {
 
   const handleSelectType = (value) => {
     setForm((prev) => ({ ...prev, type: value }));
+  };
+
+  const handleDepartmentToggle = (departmentId) => {
+    setForm((prev) => ({
+      ...prev,
+      departmentIds: prev.departmentIds.includes(departmentId)
+        ? prev.departmentIds.filter((id) => id !== departmentId)
+        : [...prev.departmentIds, departmentId],
+    }));
   };
 
   const handleImageChange = (idx, value) => {
@@ -107,6 +142,14 @@ const AddEvent = () => {
         toast.error('Location is required');
         return false;
       }
+      if (!form.committeeId) {
+        toast.error('Committee is required');
+        return false;
+      }
+      if (form.departmentIds.length === 0) {
+        toast.error('Select at least one department');
+        return false;
+      }
       if (!form.banner.trim()) {
         toast.error('Banner image link is required');
         return false;
@@ -122,12 +165,20 @@ const AddEvent = () => {
         toast.error('Event date is required');
         return false;
       }
+      if (!form.tentativeDate) {
+        toast.error('Tentative date is required');
+        return false;
+      }
       if (form.times.some((time) => !time)) {
         toast.error('All event timings must be filled');
         return false;
       }
       if (!form.cost || isNaN(form.cost) || Number(form.cost) < 0) {
         toast.error('Valid ticket cost is required');
+        return false;
+      }
+      if (!form.maxTicketsPerStudent || isNaN(form.maxTicketsPerStudent) || Number(form.maxTicketsPerStudent) < 1) {
+        toast.error('Each student ticket limit must be at least 1');
         return false;
       }
       if (form.ticketingMode === 'assigned') {
@@ -206,6 +257,10 @@ const AddEvent = () => {
       description: form.description,
       location: form.location,
       eventType: form.type,
+      committeeId: form.committeeId,
+      departmentIds: form.departmentIds,
+      tentativeDate: new Date(`${form.tentativeDate}T09:00:00`).toISOString(),
+      visibilityScope: form.visibilityScope,
       banner: form.banner,
       image: images[0],
       images,
@@ -213,6 +268,7 @@ const AddEvent = () => {
       seats,
       seatMap,
       cost: Number(form.cost),
+      maxTicketsPerStudent: Number(form.maxTicketsPerStudent),
       certificate: form.certificate,
     };
 
@@ -228,8 +284,11 @@ const AddEvent = () => {
   return (
     <div className="mx-auto w-full max-w-5xl text-white">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
-        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Add Event</h1>
+        <p className="campus-label">Committee Planning</p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Plan New Event</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/75">
+          Create the event once, scope it to the right audience, and keep it tentative until your final date is confirmed.
+        </p>
       </div>
       {/* Improved Progress Bar with Step Indicators */}
       <div className="mb-8">
@@ -297,6 +356,50 @@ const AddEvent = () => {
               </Select>
             </div>
             <div>
+              <label className="block mb-1 font-semibold text-xl">Committee</label>
+              <Select value={form.committeeId} onValueChange={(value) => handleChange({ target: { name: 'committeeId', value } })}>
+                <SelectTrigger className="h-10 border-white/30">
+                  <SelectValue placeholder="Select committee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bootstrap.committees.map((committee) => (
+                    <SelectItem key={committee._id} value={committee._id}>
+                      {committee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block mb-2 font-semibold text-xl">Audience Departments</label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {bootstrap.departments.map((department) => (
+                  <label key={department._id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    <Checkbox
+                      checked={form.departmentIds.includes(department._id)}
+                      onCheckedChange={() => handleDepartmentToggle(department._id)}
+                    />
+                    <span>{department.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1 font-semibold text-xl">Visibility Scope</label>
+              <Select value={form.visibilityScope} onValueChange={(value) => handleChange({ target: { name: 'visibilityScope', value } })}>
+                <SelectTrigger className="h-10 border-white/30">
+                  <SelectValue placeholder="Select visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visibilityOptions.map((scope) => (
+                    <SelectItem key={scope} value={scope}>
+                      {scope}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <label className="block mb-1 font-semibold text-xl">Banner Image Link</label>
               <Input className="h-10 border-white/30" placeholder="e.g https://..." name="banner" value={form.banner} onChange={handleChange} required />
             </div>
@@ -338,10 +441,15 @@ const AddEvent = () => {
           </div>
         )}
         {/* Step 2: Schedule, Seating, Cost */}
-        {step === 2 && (
+            {step === 2 && (
           <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <label className="block mb-1 font-semibold text-xl">Event Date</label>
             <Input type="date" className="h-10 border-white/30" name="date" value={form.date} onChange={handleChange} required />
+            <label className="block mb-1 font-semibold text-xl">Tentative Planning Date</label>
+            <Input type="date" className="h-10 border-white/30" name="tentativeDate" value={form.tentativeDate} onChange={handleChange} required />
+            <p className="text-sm leading-6 text-blue-100/70">
+              Students can see tentative events, but registration remains closed until you finalize the event later.
+            </p>
             <label className="block mb-1 font-semibold text-xl">Event Timings</label>
             {form.times.map((time, idx) => (
               <div key={idx} className="mb-2 flex flex-col gap-2 sm:flex-row">
@@ -464,6 +572,20 @@ const AddEvent = () => {
             )}
             <label className="block mb-1 font-semibold text-xl mt-4">Cost of Ticket (₹)</label>
             <Input className="h-10 border-white/30" placeholder="e.g 500" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <label className="block mb-1 font-semibold text-xl mt-4">Max tickets per student</label>
+            <Input
+              className="h-10 border-white/30"
+              placeholder="e.g 2"
+              name="maxTicketsPerStudent"
+              value={form.maxTicketsPerStudent}
+              onChange={handleChange}
+              type="number"
+              min="1"
+              required
+            />
+            <p className="text-sm text-blue-200/70">
+              This cap is enforced across all bookings by the same student for this event.
+            </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Button type="button" variant="secondary" className="bg-gray-700 hover:bg-gray-800 text-white" onClick={back}>Back</Button>
               <Button type="button" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={next}>Next</Button>
@@ -496,11 +618,16 @@ const AddEvent = () => {
               <p><span className="font-semibold">Description:</span> {form.description}</p>
               <p><span className="font-semibold">Location:</span> {form.location}</p>
               <p><span className="font-semibold">Type:</span> {form.type}</p>
+              <p><span className="font-semibold">Committee:</span> {bootstrap.committees.find((committee) => committee._id === form.committeeId)?.name || 'Not selected'}</p>
+              <p><span className="font-semibold">Departments:</span> {bootstrap.departments.filter((department) => form.departmentIds.includes(department._id)).map((department) => department.name).join(', ')}</p>
+              <p><span className="font-semibold">Visibility:</span> {form.visibilityScope}</p>
               <p><span className="font-semibold">Banner:</span> {form.banner}</p>
               <p><span className="font-semibold">Gallery Images:</span> {getTrimmedImages(form.images).join(', ')}</p>
               <p><span className="font-semibold">Timings:</span> {form.times.join(', ')}</p>
+              <p><span className="font-semibold">Tentative Date:</span> {form.tentativeDate}</p>
               <p><span className="font-semibold">Ticketing:</span> {form.ticketingMode === 'general' ? `General Admission (${form.capacity} tickets)` : form.seatMode === 'rows-cols' ? `${form.rows} rows x ${form.cols} columns` : `${form.seats} seats`}</p>
               <p><span className="font-semibold">Ticket Cost:</span> ₹{form.cost}</p>
+              <p><span className="font-semibold">Per-student ticket cap:</span> {form.maxTicketsPerStudent}</p>
               <p><span className="font-semibold">Certificate:</span> {form.certificate ? 'Yes' : 'No'}</p>
               <p><span className="font-semibold">Personalized Website:</span> {form.personalized ? 'Yes' : 'No'}</p>
             </div>

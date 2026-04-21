@@ -109,6 +109,14 @@ const ShowDetails = () => {
             <span>Type: {event.eventType}</span>
           </div>
           <div className="flex items-center gap-3 text-base sm:text-lg">
+            <Info className="w-6 h-6 text-blue-400" />
+            <span>Visibility: {event.visibilityScope || 'global'}</span>
+          </div>
+          <div className="flex items-center gap-3 text-base sm:text-lg">
+            <Info className="w-6 h-6 text-blue-400" />
+            <span>Lifecycle: {event.lifecycleState || 'tentative'}</span>
+          </div>
+          <div className="flex items-center gap-3 text-base sm:text-lg">
             <DollarSign className="w-6 h-6 text-green-400" />
             <span>Cost: ₹{event.cost}</span>
           </div>
@@ -137,6 +145,8 @@ const ShowDetails = () => {
           <p className="text-lg text-blue-200">Total Seats: {event.seatMap?.length || event.seats?.value || 'N/A'}</p>
         )}
         <p className="text-lg text-blue-200">Status: <span className="font-semibold">{event.status?.charAt(0).toUpperCase() + event.status?.slice(1)}</span></p>
+        <p className="text-lg text-blue-200">Tentative Date: <span className="font-semibold">{event.tentativeDate ? new Date(event.tentativeDate).toLocaleDateString('en-IN') : 'N/A'}</span></p>
+        <p className="text-lg text-blue-200">Final Date: <span className="font-semibold">{event.finalDate ? new Date(event.finalDate).toLocaleDateString('en-IN') : 'Not finalized yet'}</span></p>
 
         <div className="mt-8 text-center">
           <Link to="/organizer/list-shows">

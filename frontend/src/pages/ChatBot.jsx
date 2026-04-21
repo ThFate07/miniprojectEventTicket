@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { MessageCircle, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const ChatCard = ({ event }) => (
   <div className="bg-white/10 text-white rounded-xl p-4 shadow border border-blue-400/20 w-full max-w-sm">
@@ -103,7 +105,7 @@ const ChatBot = () => {
       {/* Chat Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full shadow-lg transition-all duration-200 ease-in-out backdrop-blur-md bg-opacity-80 border border-blue-400/20"
+        className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full shadow-lg transition-all duration-200 ease-in-out bg-opacity-80 border border-blue-400/20"
       >
         {isOpen ? (
           <X className="h-6 w-6" />
@@ -114,7 +116,7 @@ const ChatBot = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="absolute bottom-20 right-0 w-96 h-[800px] glass rounded-3xl flex flex-col border border-blue-400/20 shadow-2xl bg-white/10 backdrop-blur-md">
+        <div className="absolute bottom-20 right-0 w-96 h-[800px] glass rounded-3xl flex flex-col border border-blue-400/20 shadow-2xl bg-white/10">
           {/* Header */}
           <div className="bg-blue-900/40 text-white px-6 py-4 rounded-t-3xl border-b border-blue-400/20 flex items-center justify-between">
             <h1 className="text-xl font-semibold">AI Assistant</h1>
@@ -144,23 +146,23 @@ const ChatBot = () => {
           </div>
 
           {/* Input Form */}
-          <form onSubmit={handleSubmit} className="p-4 border-t border-blue-400/20 bg-white/10 backdrop-blur-md rounded-b-3xl">
+          <form onSubmit={handleSubmit} className="p-4 border-t border-blue-400/20 bg-white/10 rounded-b-3xl">
             <div className="flex space-x-4">
-              <input
+              <Input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 p-2 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/10 backdrop-blur-sm placeholder:text-white/50 text-white"
+                className="flex-1"
                 disabled={loading}
               />
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-500/80 text-white px-6 py-2 rounded-xl hover:bg-blue-600/80 transition-colors disabled:bg-blue-300/60 shadow border border-blue-400/20"
+                className="px-6"
               >
                 Send
-              </button>
+              </Button>
             </div>
           </form>
         </div>

@@ -22,11 +22,12 @@ const Seats = () => {
   const navigate = useNavigate();
   const isGeneralAdmission = eventData?.seats?.type === 'general';
   const availableGeneralSeats = eventData?.seatMap?.filter((seat) => !seat.isBooked) || [];
+  const maxTicketsPerStudent = Number(eventData?.maxTicketsPerStudent || 1);
+  const remainingTicketsForCurrentUser = Number(eventData?.remainingTicketsForCurrentUser ?? maxTicketsPerStudent);
 
   const fetchSeats = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API}/events/get-seats-times/${id}`)
-      console.log(response.data);
+      const response = await axios.get(`${import.meta.env.VITE_API}/events/get-seats-times/${id}`, { withCredentials: true })
       setEventData(response.data);
       setTicketCost(response.data.cost || 0);
       if (response.data.eventDateTime && response.data.eventDateTime.length > 0) {
@@ -34,8 +35,11 @@ const Seats = () => {
       }
       setLoading(false);
     } catch (error) {
+      const message = error.response?.data?.message || 'Unable to load seats for this event.';
+      toast.error(message);
       console.log(error);
       setLoading(false);
+      navigate(`/events/${id}`, { replace: true });
     }
   }
 
@@ -123,6 +127,13 @@ const Seats = () => {
     fetchSeats();
   } , [])
 
+  useEffect(() => {
+    if (eventData && (!eventData.isFinalized || eventData.lifecycleState !== 'registration_open')) {
+      toast.error('This event is still in planning. Registration is not open yet.');
+      navigate(`/events/${id}`, { replace: true });
+    }
+  }, [eventData, id, navigate]);
+
   // Periodic refresh of seat locks to handle expired locks
   useEffect(() => {
     if (!eventData || isGeneralAdmission) {
@@ -173,6 +184,8 @@ const Seats = () => {
     if (isCurrentlySelected) {
       // Deselecting seat
       await handleSeatDeselection(seatId);
+    } else if (selectedSeats.length >= remainingTicketsForCurrentUser) {
+      toast.error(`You can only select up to ${remainingTicketsForCurrentUser} ticket${remainingTicketsForCurrentUser === 1 ? '' : 's'} for this event`);
     } else if (!isCurrentlyLocked) {
       // Selecting seat
       await handleSeatSelection(seatId);
@@ -317,7 +330,10 @@ const Seats = () => {
   }, [isGeneralAdmission, selectedSeats, id]);
 
   const handleGeneralAdmissionQuantity = (count) => {
-    const safeCount = Math.max(0, Math.min(count, availableGeneralSeats.length));
+    const safeCount = Math.max(0, Math.min(count, availableGeneralSeats.length, remainingTicketsForCurrentUser));
+    if (count > remainingTicketsForCurrentUser) {
+      toast.error(`You can only book up to ${remainingTicketsForCurrentUser} ticket${remainingTicketsForCurrentUser === 1 ? '' : 's'} for this event`);
+    }
     setSelectedSeats(availableGeneralSeats.slice(0, safeCount).map((seat) => seat.seatLabel));
   };
 
@@ -354,14 +370,7 @@ const Seats = () => {
         }
         return;
       }
-
-      // Log the data being sent to checkout
-      console.log('Data being sent to Checkout:');
-      console.log('Selected Seats:', selectedSeats);
-      console.log('Selected Show Time:', selectedTiming);
-      console.log('Total Amount:', totalAmount);
-      console.log('Event ID:', id);
-      console.log('Event Data:', eventData);
+      toast.success(`${isGeneralAdmission ? 'Tickets' : 'Seats'} confirmed. Moving to checkout.`);
 
       // Navigate to checkout with state data
       navigate(`/checkout/${id}`, {
@@ -375,7 +384,7 @@ const Seats = () => {
         }
       });
     } catch (error) {
-      toast.error('Failed to verify seat availability');
+      toast.error(error.response?.data?.message || 'Failed to verify seat availability');
       console.error('Error checking seat availability:', error);
     }
   };
@@ -482,6 +491,11 @@ const Seats = () => {
         {/* Right Section: Seat Selection */}
         <div className="section-card flex w-full flex-col items-center p-5 shadow-lg sm:p-6 lg:flex-1">
           <h2 className="mb-6 text-center text-2xl font-bold">{isGeneralAdmission ? 'Select ticket quantity' : 'Select your seat'}</h2>
+          <div className="mb-6 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-blue-100">
+            {remainingTicketsForCurrentUser > 0
+              ? `Per-student limit: ${maxTicketsPerStudent} ticket${maxTicketsPerStudent === 1 ? '' : 's'} total. You can book ${remainingTicketsForCurrentUser} more right now.`
+              : 'You have already reached the ticket limit for this event.'}
+          </div>
 
           {isGeneralAdmission ? (
             <div className="w-full max-w-xl flex flex-col items-center gap-6">
@@ -506,7 +520,7 @@ const Seats = () => {
                 <button
                   className="h-12 w-12 rounded-full bg-blue-600 text-2xl disabled:opacity-40"
                   onClick={() => handleGeneralAdmissionQuantity(selectedSeats.length + 1)}
-                  disabled={selectedSeats.length >= availableGeneralSeats.length}
+                  disabled={selectedSeats.length >= availableGeneralSeats.length || selectedSeats.length >= remainingTicketsForCurrentUser}
                 >
                   +
                 </button>
@@ -558,7 +572,7 @@ const Seats = () => {
           <div className="mt-6 flex w-full justify-center">
             <button
               className="w-full rounded-lg bg-blue-600 px-8 py-3 text-lg font-bold text-white shadow-lg transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-              disabled={selectedSeats.length === 0}
+              disabled={selectedSeats.length === 0 || remainingTicketsForCurrentUser === 0}
               onClick={handleProceedToCheckout}
             >
               Proceed

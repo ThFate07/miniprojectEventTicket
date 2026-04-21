@@ -12,9 +12,9 @@ const BookingCard = ({ booking }) => {
 
   if (!event) return null;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
-      downloadTicketPdf({ booking, event });
+      await downloadTicketPdf({ booking, event });
     } catch (error) {
       toast.error(error.message || 'Unable to download ticket.');
     }
@@ -66,20 +66,20 @@ const BookingCard = ({ booking }) => {
         <div className="text-sm text-blue-100 mb-1">Paid: ₹{booking.paymentAmt}</div>
 
         <div className="text-sm font-semibold px-2 py-1 rounded text-yellow-300">
-          Status: {booking.event_status}
+          Status: {event.lifecycleState || booking.event_status}
         </div>
 
         <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             onClick={handleDownload}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/45 hover:bg-emerald-500/18"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/45 hover:bg-emerald-500/18"
           >
             <Download className="h-4 w-4" />
             Download Ticket
           </button>
           <button
             onClick={handleShare}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/45 hover:bg-sky-500/18"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-4 py-3 font-semibold text-white shadow-[0_10px_30px_rgba(15,23,42,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/45 hover:bg-sky-500/18"
           >
             <Share2 className="h-4 w-4" />
             Share Ticket
@@ -103,9 +103,7 @@ const MyBookings = () => {
   const fetchBookings = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API}/events/get-my-bookings`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }
+        withCredentials: true,
       });
       setBookings(res.data.bookings);
     } catch (error) {
@@ -122,7 +120,7 @@ const MyBookings = () => {
   return (
     <div className="app-page min-h-screen">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Attendee</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Student</p>
         <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">My Bookings</h1>
       </div>
       {loading ? (

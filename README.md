@@ -1,8 +1,8 @@
-# Host My Show - Event Management & Ticketing Platform
+# Book My Event - Event Management & Ticketing Platform
 
 ## Overview
 
-**Host My Show** is a full-featured event management and ticket booking platform built using the MERN stack. It allows users to explore and book events, while organizers can create and manage their shows. Admins oversee event approvals, ensuring a smooth and trusted experience. The platform includes OTP-based login, role-based access, and a clean, responsive UI using modern design principles like glassmorphism.
+**Book My Event** is a full-featured event management and ticket booking platform built using the MERN stack. It allows users to explore and book events, while organizers can create and manage their shows. Admins oversee event approvals, ensuring a smooth and trusted experience. The platform includes OTP-based login, role-based access, and a clean, responsive UI using modern design principles like glassmorphism.
 
 ---
 
@@ -21,7 +21,7 @@
 ---
 
 ## Architecture
-<img width="7836" height="5779" alt="host-my-show" src="https://github.com/user-attachments/assets/975c2bd6-16df-4ec5-9ab7-acb59fd7b87a" />
+<img width="7836" height="5779" alt="book-my-event" src="https://github.com/user-attachments/assets/975c2bd6-16df-4ec5-9ab7-acb59fd7b87a" />
 
 
 ## Tech Stack
@@ -79,7 +79,7 @@
 
 ```bash
 git clone <your-repository-url>
-cd host-my-show
+cd book-my-event
 ```
 
 2. **Install Dependencies**
@@ -92,7 +92,39 @@ cd ../frontend
 npm install
 ```
 
-3. **Run Frontend and Backend Together**
+3. **Configure Environment**
+
+Create one central environment file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Do not create separate `frontend/.env` or `backend/.env` files. The backend loads the root `.env`, and Vite is configured to read frontend variables from the same root file.
+
+Required local values:
+
+```env
+PORT=8000
+SERVER_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:5173
+CLIENT_URL=http://localhost:5173
+VITE_API=http://localhost:8000/api
+MONGO_URI=mongodb://127.0.0.1:27017/book-my-event
+JWT_SECRET=replace-with-a-long-random-secret
+QR_SIGNING_SECRET=replace-with-a-long-random-secret
+RAZORPAY_KEY=rzp_test_replace_me
+RAZORPAY_KEY_SECRET=replace_me
+VITE_RAZORPAY_KEY=rzp_test_replace_me
+EMAIL=your-email@example.com
+PASSWORD=your-email-app-password
+GEMINI_API_KEY=replace_me
+NODE_ENV=development
+```
+
+Only variables prefixed with `VITE_` are exposed to the frontend bundle.
+
+4. **Run Frontend and Backend Together**
 
 ```bash
 npm run dev

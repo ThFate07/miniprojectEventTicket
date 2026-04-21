@@ -1,5 +1,11 @@
 .DS_Store
 
+# Central environment file
+.env
+.env.local
+.env.*.local
+!.env.example
+
 # Root dependencies
 /node_modules/
 

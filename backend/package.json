@@ -1,13 +1,15 @@
 {
-  "name": "host-my-show-backend",
-  "displayName": "Host My Show (Backend)",
+  "name": "book-my-event-backend",
+  "displayName": "Book My Event (Backend)",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "seed:college-demo": "node scripts/seedCollegeDemo.js",
+    "db:reset-demo": "node scripts/resetAndSeedDemo.js"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.4",
     "nodemon": "^3.1.10",
+    "puppeteer": "^24.42.0",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "sentiment": "^5.0.2",

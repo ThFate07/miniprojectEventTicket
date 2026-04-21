@@ -1,17 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import { Menu } from 'lucide-react';
 import { Outlet, useLocation } from 'react-router-dom';
-
-const routeTitles = {
-  '/organizer/dashboard': 'Dashboard Overview',
-  '/organizer/add-event': 'Add Event',
-  '/organizer/list-shows': 'Your Shows',
-  '/organizer/list-bookings': 'Manage Bookings',
-  '/organizer/scan-entry': 'Scan Entry',
-  '/organizer/reviews': 'Event Reviews',
-  '/organizer/marketing': 'Email Marketing',
-};
 
 const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -21,22 +11,13 @@ const DashboardLayout = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  const pageTitle = useMemo(() => {
-    const matched = Object.entries(routeTitles).find(([path]) => location.pathname.startsWith(path));
-    return matched?.[1] || 'Organizer Workspace';
-  }, [location.pathname]);
-
   return (
     <div className="min-h-[calc(100vh-6rem)] text-white">
       <div className="app-page flex min-h-[calc(100vh-6rem)] gap-6 lg:items-start">
         <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
         <main className="min-w-0 flex-1">
-          <div className="section-card mb-5 flex items-center justify-between gap-4 px-4 py-4 sm:px-5 lg:hidden">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-200/70">Organizer</p>
-              <h1 className="mt-1 text-xl font-bold text-white">{pageTitle}</h1>
-            </div>
+          <div className="mb-5 flex justify-end lg:hidden">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}

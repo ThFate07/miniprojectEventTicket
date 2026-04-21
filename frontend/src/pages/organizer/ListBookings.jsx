@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, Clock, User, Ticket, DollarSign, Search, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const ListBookings = () => {
   const [selectedEvent, setSelectedEvent] = useState('');
@@ -43,6 +45,13 @@ const ListBookings = () => {
           bookingsByEvent[eventId].push({
             id: booking._id,
             userName: booking.user_id?.username || 'Unknown',
+            fullName: booking.user_id?.fullName || booking.user_id?.username || 'Unknown',
+            attendeeEmail: booking.user_id?.email || '',
+            collegeEmail: booking.user_id?.collegeEmail || '',
+            studentId: booking.user_id?.studentId || '',
+            phoneNumber: booking.user_id?.phoneNumber || '',
+            collegeName: booking.user_id?.collegeId?.name || '',
+            departmentName: booking.user_id?.departmentId?.name || '',
             bookingTime: booking.booking_dateTime,
             seats: booking.seats.includes(',') ? booking.seats.split(',') : [booking.seats],
             total: booking.paymentAmt,
@@ -65,7 +74,15 @@ const ListBookings = () => {
 
     if (searchTerm) {
       filteredBookings = filteredBookings.filter(booking =>
-        booking.userName.toLowerCase().includes(searchTerm.toLowerCase())
+        [
+          booking.userName,
+          booking.fullName,
+          booking.studentId,
+          booking.collegeEmail,
+          booking.attendeeEmail,
+        ]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -83,7 +100,7 @@ const ListBookings = () => {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-200/70">Organizer</p>
-          <h1 className="mt-2 text-3xl font-bold text-blue-300 sm:text-4xl">Manage Bookings</h1>
+          <h1 className="mt-2 text-3xl font-bold text-blue-300 sm:text-4xl">Event Bookings</h1>
         </div>
         <button
           type="button"
@@ -99,42 +116,42 @@ const ListBookings = () => {
         <div className={`mobile-collapse-panel space-y-4 ${showFilters ? 'max-h-[28rem] opacity-100' : 'max-h-[5rem] opacity-100 md:max-h-[28rem]'}`}>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-center">
             <label htmlFor="event-select" className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">Select Event</label>
-            <select
-              id="event-select"
-              className="rounded-xl border border-blue-400/20 bg-gray-800 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 md:min-w-72"
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-            >
-              <option value="">-- Select an Event --</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.title}
-                </option>
-              ))}
-            </select>
+            <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+              <SelectTrigger id="event-select" className="md:min-w-72">
+                <SelectValue placeholder="Select an event" />
+              </SelectTrigger>
+              <SelectContent>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {selectedEvent && (
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
               <div className="relative flex items-center">
             <Search className="absolute left-3 w-5 h-5 text-gray-400" />
-            <input
+            <Input
               type="text"
               placeholder="Search by attendee name..."
-              className="w-full rounded-xl border border-blue-400/20 bg-gray-800 py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            className="rounded-xl border border-blue-400/20 bg-gray-800 p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="All">All Statuses</option>
-            <option value="Confirmed">Confirmed</option>
-            <option value="Checked in">Checked in</option>
-          </select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Statuses</SelectItem>
+              <SelectItem value="Confirmed">Confirmed</SelectItem>
+              <SelectItem value="Checked in">Checked in</SelectItem>
+            </SelectContent>
+          </Select>
             </div>
           )}
         </div>
@@ -144,12 +161,33 @@ const ListBookings = () => {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {bookingsForSelectedEvent.map((booking) => (
             <div key={booking.id} className="section-card rounded-[1.5rem] p-6">
-              <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-400" /> {booking.userName}
-              </h3>
+              <div className="mb-3">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-400" /> {booking.fullName}
+                </h3>
+                <p className="mt-1 text-sm text-blue-200/80">@{booking.userName}</p>
+              </div>
               <p className="text-blue-200 text-sm mb-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> Booking Time: {new Date(booking.bookingTime).toLocaleString()}
               </p>
+              {booking.studentId && (
+                <p className="text-blue-200 text-sm mb-2">College ID: {booking.studentId}</p>
+              )}
+              {booking.collegeName && (
+                <p className="text-blue-200 text-sm mb-2">College: {booking.collegeName}</p>
+              )}
+              {booking.departmentName && (
+                <p className="text-blue-200 text-sm mb-2">Department: {booking.departmentName}</p>
+              )}
+              {booking.phoneNumber && (
+                <p className="text-blue-200 text-sm mb-2">Phone: {booking.phoneNumber}</p>
+              )}
+              {booking.collegeEmail && (
+                <p className="text-blue-200 text-sm mb-2">College Email: {booking.collegeEmail}</p>
+              )}
+              {booking.attendeeEmail && (
+                <p className="text-blue-200 text-sm mb-2">Email: {booking.attendeeEmail}</p>
+              )}
               <p className="text-blue-200 text-sm mb-2 flex items-center gap-2">
                 <Ticket className="w-4 h-4" /> Seats: {booking.seats.join(', ')}
               </p>

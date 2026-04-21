@@ -7,9 +7,14 @@ export const updateStatus = async () => {
   const events = await Event.find();
   console.log(`Running event status update at ${now.format()}`);
   console.log(`Found ${events.length} events`);
-  console.log(events)
   for (const event of events) {
-    const eventStart = dayjs(event.eventDateTime[0]);
+    const sourceDate = event.finalDate || event.eventDateTime?.[0] || event.tentativeDate;
+
+    if (!sourceDate) {
+      continue;
+    }
+
+    const eventStart = dayjs(sourceDate);
     let newStatus = 'upcoming';
     if (now.isAfter(eventStart.add(3, 'hour'))) {
       newStatus = 'completed';
@@ -20,6 +25,9 @@ export const updateStatus = async () => {
     if (event.status !== newStatus) {
       console.log(`Updating event ${event._id}: ${event.status} → ${newStatus}`);
       event.status = newStatus;
+      if (newStatus !== "upcoming" && event.lifecycleState === "registration_open") {
+        event.lifecycleState = "registration_closed";
+      }
       await event.save({ validateBeforeSave: false });
     }
   }

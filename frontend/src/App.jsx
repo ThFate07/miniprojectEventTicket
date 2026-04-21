@@ -5,6 +5,7 @@ import { userStore } from './context/userContext'
 import toast from 'react-hot-toast'
 import Reviews from './pages/organizer/Reviews'
 import Marketing from './pages/organizer/Marketing'
+import { isOrganizerRole, isPrivilegedRole } from './lib/auth';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Navbar = lazy(() => import('./components/Navbar'));
@@ -36,22 +37,30 @@ const ProtectedOrganizerRoute = ({ children }) => {
   if (!isAuth) {
     return <Navigate to="/login" replace />;
   }
-  if (user?.role !== 'Organizer') {
+  if (!isOrganizerRole(user?.role)) {
     toast.error("This page requires an organizer account.");
     return <Navigate to="/" replace />;
   }
   return children;
 };
 
-const ProtectedAttendeeRoute = ({ children }) => {
+const ProtectedAdminRoute = ({ children }) => {
   const isAuth = userStore((state) => state.isAuth);
   const user = userStore((state) => state.user);
   if (!isAuth) {
     return <Navigate to="/login" replace />;
   }
-  if (user?.role !== 'Attendee') {
-    toast.error("Bookings and ticket purchases require an attendee account.");
-    return <Navigate to="/" replace />;
+  if (!isPrivilegedRole(user?.role)) {
+    toast.error("This page requires an admin account.");
+    return <Navigate to="/organizer/dashboard" replace />;
+  }
+  return children;
+};
+
+const ProtectedBookingRoute = ({ children }) => {
+  const isAuth = userStore((state) => state.isAuth);
+  if (!isAuth) {
+    return <Navigate to="/login" replace />;
   }
   return children;
 };
@@ -131,10 +140,10 @@ const App = () => {
           <Route path="/login" element={<Login/>}/>
           <Route path="/profile" element={<Profile/>}/>
           <Route path="/events" element={<Events/>}/>
-          <Route path="/my-bookings" element={<ProtectedAttendeeRoute><MyBookings /></ProtectedAttendeeRoute>} />
+          <Route path="/my-bookings" element={<ProtectedBookingRoute><MyBookings /></ProtectedBookingRoute>} />
           <Route path="/events/:id" element={<EventDetails/>} />
-          <Route path="/seats/:id" element={<ProtectedAttendeeRoute><Seats/></ProtectedAttendeeRoute>} />
-          <Route path="/checkout/:id" element={<ProtectedAttendeeRoute><Checkout/></ProtectedAttendeeRoute>} />
+          <Route path="/seats/:id" element={<ProtectedBookingRoute><Seats/></ProtectedBookingRoute>} />
+          <Route path="/checkout/:id" element={<ProtectedBookingRoute><Checkout/></ProtectedBookingRoute>} />
           <Route path="/organizer" element={<ProtectedOrganizerRoute><Dashboard /></ProtectedOrganizerRoute>}>
             <Route path="dashboard" element={<DashboardHome />} />
             <Route path="add-event" element={<AddEvent />} />
@@ -146,7 +155,7 @@ const App = () => {
             <Route path="show/:id" element={<ShowDetails />} />
             <Route path="edit-event/:id" element={<EditEvent />} />
           </Route>
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ChatBot />

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, Minus, Search, User, Calendar, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Reviews = () => {
   const [events, setEvents] = useState([]);
@@ -46,8 +48,7 @@ const Reviews = () => {
     }
   };
 
-  const handleEventChange = (e) => {
-    const eventId = e.target.value;
+  const handleEventChange = (eventId) => {
     setSelectedEvent(eventId);
     if (eventId) {
       fetchReviews(eventId);
@@ -118,25 +119,25 @@ const Reviews = () => {
 
       <div className="section-card mb-8 p-4 sm:p-5">
         <div className={`mobile-collapse-panel grid gap-4 ${showFilters ? 'max-h-[20rem] opacity-100' : 'max-h-[5rem] opacity-100 md:max-h-[20rem]'} md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]`}>
-          <select
-            className="rounded-xl border border-blue-400/20 bg-gray-800 p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={selectedEvent}
-            onChange={handleEventChange}
-          >
-            <option value="">-- Select an Event --</option>
-            {events.map((event) => (
-              <option key={event._id} value={event._id}>
-                {event.title}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedEvent} onValueChange={handleEventChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select an event" />
+            </SelectTrigger>
+            <SelectContent>
+              {events.map((event) => (
+                <SelectItem key={event._id} value={event._id}>
+                  {event.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <div className="relative flex items-center">
           <Search className="absolute left-3 w-5 h-5 text-gray-400" />
-          <input
+          <Input
             type="text"
             placeholder="Search reviews..."
-            className="w-full rounded-xl border border-blue-400/20 bg-gray-800 py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />

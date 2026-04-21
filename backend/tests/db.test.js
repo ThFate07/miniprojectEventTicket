@@ -1,10 +1,10 @@
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { checkDatabaseConnection } from "../utils/dbStatus.js";
 import { connectDB } from "../utils/connectDB.js";
+import { loadEnv } from "../utils/loadEnv.js";
 
 // Load environment variables before tests
-dotenv.config();
+loadEnv();
 
 describe("Database Connection Tests", () => {
     beforeAll(async () => {

@@ -45,6 +45,11 @@ const eventSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  maxTicketsPerStudent: {
+    type: Number,
+    default: 1,
+    min: 1
+  },
   certificate: {
     type: Boolean
   },
@@ -67,6 +72,45 @@ const eventSchema = new mongoose.Schema({
   organizer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    default: null,
+    index: true
+  },
+  departmentIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  }],
+  committeeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Committee',
+    default: null,
+    index: true
+  },
+  tentativeDate: {
+    type: Date,
+    default: null
+  },
+  finalDate: {
+    type: Date,
+    default: null
+  },
+  isFinalized: {
+    type: Boolean,
+    default: false
+  },
+  visibilityScope: {
+    type: String,
+    enum: ['department', 'college', 'global'],
+    default: 'department',
+    index: true
+  },
+  lifecycleState: {
+    type: String,
+    enum: ['draft', 'tentative', 'finalized', 'registration_open', 'registration_closed'],
+    default: 'tentative'
   },
   users: [{
     type: mongoose.Schema.Types.ObjectId,

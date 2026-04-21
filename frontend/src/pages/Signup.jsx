@@ -5,14 +5,18 @@ import { userStore } from "@/context/userContext";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { getPostLoginRoute } from "@/lib/auth";
 
 const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    fullName: "",
     email: "",
+    collegeEmail: "",
+    studentId: "",
+    phoneNumber: "",
     username: "",
     password: "",
-    role: "Attendee",
   });
 
   const isAuth = userStore((state) => state.isAuth);
@@ -38,7 +42,7 @@ const Signup = () => {
       );
       toast.success(response.data.message);
       await login(response.data.user);
-      navigate(formData.role === "Organizer" ? "/organizer/dashboard" : "/");
+      navigate(getPostLoginRoute(response.data.user));
     } catch (error) {
       toast.error(error.response.data.message);
     }
@@ -57,7 +61,7 @@ const Signup = () => {
 
   return (
     <div className="min-h-[90vh] flex items-center justify-center p-4 pt-12 px-8">
-      <div className="relative backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-10 shadow-2xl w-[960px] flex justify-between gap-24">
+      <div className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] border border-white/10 rounded-3xl p-10 shadow-2xl w-[960px] flex justify-between gap-24">
         <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 rounded-3xl"></div>
 
         {/* Left side - Illustration */}
@@ -75,24 +79,64 @@ const Signup = () => {
             <h1 className="text-white text-4xl font-bold mb-2 bg-gradient-to-r from-white to-gray-300 bg-clip-text">
               Create Account
             </h1>
-            <p className="text-white/70 text-sm">Join us and start your journey</p>
+            <p className="text-white/70 text-sm">
+              Add your student details now so organizers can identify attendees clearly.
+            </p>
+            <p className="mt-2 text-xs text-white/45">
+              College access is still linked later through your invite code.
+            </p>
           </div>
 
-          <form onSubmit={handleSignup} className="space-y-6">
+          <form onSubmit={handleSignup} className="space-y-5">
+            <Input
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleInputChange}
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full"
+              placeholder="Full name"
+              required
+            />
             <Input
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl backdrop-blur-sm"
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl"
               placeholder="Email address"
               type="email"
+              required
+            />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Input
+                name="collegeEmail"
+                value={formData.collegeEmail}
+                onChange={handleInputChange}
+                className="text-white h-14 placeholder:text-white/50 text-lg w-full"
+                placeholder="College email ID (optional)"
+                type="email"
+              />
+              <Input
+                name="studentId"
+                value={formData.studentId}
+                onChange={handleInputChange}
+                className="text-white h-14 placeholder:text-white/50 text-lg w-full"
+                placeholder="College ID / Student ID"
+                required
+              />
+            </div>
+            <Input
+              name="phoneNumber"
+              value={formData.phoneNumber}
+              onChange={handleInputChange}
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full"
+              placeholder="Phone number"
+              type="tel"
               required
             />
             <Input
               name="username"
               value={formData.username}
               onChange={handleInputChange}
-              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl backdrop-blur-sm"
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl"
               placeholder="Username"
               required
             />
@@ -100,21 +144,11 @@ const Signup = () => {
               name="password"
               value={formData.password}
               onChange={handleInputChange}
-              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl backdrop-blur-sm"
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl"
               placeholder="Password"
               type="password"
               required
             />
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleInputChange}
-              className="w-full h-14 rounded-xl border-white/30 bg-white/10 backdrop-blur-sm text-white text-lg px-4"
-            >
-              <option value="Organizer" className="bg-gray-800 text-white">Organizer</option>
-              <option value="Attendee" className="bg-gray-800 text-white">Attendee</option>
-            </select>
-
             {/* Blue styled button like Login page */}
             <Button
               type="submit"
@@ -124,7 +158,7 @@ const Signup = () => {
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating Account...
+                  Creating profile...
                 </div>
               ) : (
                 "Create Account"

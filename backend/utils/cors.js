@@ -1,3 +1,7 @@
+import { loadEnv } from "./loadEnv.js";
+
+loadEnv();
+
 const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
 
 const defaultOrigins = [

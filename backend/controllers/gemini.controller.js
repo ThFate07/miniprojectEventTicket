@@ -1,6 +1,7 @@
 import { model } from "../app.js";
 import { Event } from "../models/events.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { isEventVisibleToUser } from "../utils/eventAccess.js";
 
 const simplifyEvent = (event, queryDate = new Date()) => {
   const availableSeats =
@@ -26,7 +27,9 @@ const simplifyEvent = (event, queryDate = new Date()) => {
   };
 };
 
-const getRecommendedEvents = async (date, time) => {
+const filterVisibleEvents = (user, events) => events.filter((event) => isEventVisibleToUser(user, event));
+
+const getRecommendedEvents = async (user, date, time) => {
   let queryDate = new Date();
   if (date && time) queryDate = new Date(`${date}T${time}`);
   else if (date) queryDate = new Date(`${date}T00:00`);
@@ -36,10 +39,10 @@ const getRecommendedEvents = async (date, time) => {
     eventDateTime: { $elemMatch: { $gte: queryDate } }
   }).sort({ eventDateTime: 1 }).limit(5);
 
-  return matchedEvents.map(e => simplifyEvent(e, queryDate));
+  return filterVisibleEvents(user, matchedEvents).map(e => simplifyEvent(e, queryDate));
 };
 
-const getTodaysEvents = async () => {
+const getTodaysEvents = async (user) => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date();
@@ -49,31 +52,31 @@ const getTodaysEvents = async () => {
     eventDateTime: { $elemMatch: { $gte: start, $lte: end } }
   }).sort({ eventDateTime: 1 });
 
-  return matchedEvents.map(e => simplifyEvent(e, start));
+  return filterVisibleEvents(user, matchedEvents).map(e => simplifyEvent(e, start));
 };
 
-const getEventsByLocation = async (location) => {
+const getEventsByLocation = async (user, location) => {
   const matchedEvents = await Event.find({
     location: { $regex: location, $options: "i" }
   }).sort({ eventDateTime: 1 }).limit(10);
 
-  return matchedEvents.map(e => simplifyEvent(e));
+  return filterVisibleEvents(user, matchedEvents).map(e => simplifyEvent(e));
 };
 
-const getEventsByTitle = async (title) => {
+const getEventsByTitle = async (user, title) => {
   const matchedEvents = await Event.find({
     title: { $regex: title, $options: "i" }
   }).sort({ eventDateTime: 1 }).limit(10);
 
-  return matchedEvents.map(e => simplifyEvent(e));
+  return filterVisibleEvents(user, matchedEvents).map(e => simplifyEvent(e));
 };
 
-const getEventsByDescription = async (keyword) => {
+const getEventsByDescription = async (user, keyword) => {
   const matchedEvents = await Event.find({
     description: { $regex: keyword, $options: "i" }
   }).sort({ eventDateTime: 1 }).limit(10);
 
-  return matchedEvents.map(e => simplifyEvent(e));
+  return filterVisibleEvents(user, matchedEvents).map(e => simplifyEvent(e));
 };
 
 const geminiChatBot = asyncHandler(async (req, res) => {
@@ -90,19 +93,19 @@ const geminiChatBot = asyncHandler(async (req, res) => {
 
     switch (call.name) {
       case "getRecommendedEvents":
-        data = await getRecommendedEvents(args.date, args.time);
+        data = await getRecommendedEvents(req.user, args.date, args.time);
         break;
       case "getTodaysEvents":
-        data = await getTodaysEvents();
+        data = await getTodaysEvents(req.user);
         break;
       case "getEventsByLocation":
-        data = await getEventsByLocation(args.location);
+        data = await getEventsByLocation(req.user, args.location);
         break;
       case "getEventsByTitle":
-        data = await getEventsByTitle(args.title);
+        data = await getEventsByTitle(req.user, args.title);
         break;
       case "getEventsByDescription":
-        data = await getEventsByDescription(args.keyword);
+        data = await getEventsByDescription(req.user, args.keyword);
         break;
       default:
         return res.json({ reply: response.text() });

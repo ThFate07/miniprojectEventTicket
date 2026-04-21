@@ -120,7 +120,7 @@
   }
 
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
 
   body {
@@ -130,10 +130,11 @@
       radial-gradient(circle at top left, rgba(255, 187, 92, 0.16), transparent 28%),
       radial-gradient(circle at top right, rgba(44, 196, 176, 0.16), transparent 24%),
       linear-gradient(180deg, #151311 0%, #11161b 48%, #121212 100%);
-    background-attachment: fixed;
+    background-attachment: scroll;
     min-height: 100vh;
     position: relative;
     z-index: 0;
+    overflow-x: hidden;
   }
 
   body::before {
@@ -145,7 +146,7 @@
       linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
     background-size: 72px 72px;
     mask-image: radial-gradient(circle at center, black, transparent 85%);
-    opacity: 0.28;
+    opacity: 0.14;
     z-index: -1;
     pointer-events: none;
   }
@@ -214,14 +215,12 @@
 
 /* Custom glass morphism effects */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.05));
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-dark {
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(19, 24, 35, 0.88), rgba(12, 18, 28, 0.8));
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -261,9 +260,41 @@
 }
 
 .section-card {
-  @apply rounded-[1.75rem] border border-white/10 bg-white/5 shadow-xl backdrop-blur;
+  @apply rounded-[1.75rem] border border-white/10 bg-white/5 shadow-lg;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+}
+
+.event-card-surface {
+  @apply rounded-[1.75rem] border border-white/10 bg-white/5 shadow-lg;
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04));
+}
+
+.campus-hero-card {
+  background:
+    radial-gradient(circle at top left, rgba(255, 182, 92, 0.14), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(44, 196, 176, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04));
+  @apply rounded-[1.75rem] border border-white/10 shadow-lg;
+}
+
+.campus-label {
+  @apply text-xs font-semibold uppercase tracking-[0.24em] text-[#f4d58d];
 }
 
 .mobile-collapse-panel {
   @apply overflow-hidden transition-all duration-300 ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

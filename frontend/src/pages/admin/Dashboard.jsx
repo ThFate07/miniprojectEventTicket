@@ -1,499 +1,331 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
-  UserCheck, 
-  UserX, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Search,
-  Filter,
-  Download,
-  BarChart3,
-  PieChart,
-  Activity,
-  Shield,
+import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import {
+  Building2,
+  CalendarDays,
+  ClipboardCopy,
+  GraduationCap,
+  Mail,
+  ShieldCheck,
   Ticket,
-  MapPin,
-  Clock
+  Users,
 } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { userStore } from '@/context/userContext';
+import { ROLE_VALUES, normalizeRole } from '@/lib/auth';
+
+const roleOptions = [
+  { value: ROLE_VALUES.STUDENT, label: 'Student' },
+  { value: ROLE_VALUES.ORGANIZER, label: 'Organizer' },
+  { value: ROLE_VALUES.COLLEGE_ADMIN, label: 'College Admin' },
+];
+
+const lifecycleLabels = {
+  draft: 'Draft',
+  tentative: 'Tentative',
+  finalized: 'Finalized',
+  registration_open: 'Registration Open',
+  registration_closed: 'Registration Closed',
+};
+
+const formatRole = (role) =>
+  String(role || 'student')
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const StatCard = ({ icon, label, value, tone }) => (
+  <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5 shadow-xl">
+    <div className="mb-4 flex items-center justify-between">
+      <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">{label}</p>
+      {React.createElement(icon, { className: `h-6 w-6 ${tone}` })}
+    </div>
+    <p className="text-3xl font-bold text-white">{value}</p>
+  </div>
+);
+
 const Dashboard = () => {
+  const user = userStore((state) => state.user);
+  const role = normalizeRole(user?.role);
+  const isPlatformAdmin = role === ROLE_VALUES.PLATFORM_ADMIN;
   const [activeTab, setActiveTab] = useState('overview');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-
-  // Mock data for demonstration
-  const stats = {
-    totalUsers: 12500,
-    totalOrganizers: 450,
-    totalAttendees: 12050,
-    totalEvents: 1250,
-    totalRevenue: 2500000,
-    activeEvents: 89,
-    completedEvents: 1161,
-    pendingEvents: 12
-  };
-
-  const recentUsers = [
-    {
-      id: 1,
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      role: 'organizer',
-      status: 'active',
-      joinDate: '2024-01-15',
-      eventsCount: 5,
-      lastActive: '2024-01-20 10:30 AM'
-    },
-    {
-      id: 2,
-      name: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
-      role: 'attendee',
-      status: 'active',
-      joinDate: '2024-01-14',
-      eventsCount: 12,
-      lastActive: '2024-01-20 09:15 AM'
-    },
-    {
-      id: 3,
-      name: 'Mike Wilson',
-      email: 'mike.w@email.com',
-      role: 'organizer',
-      status: 'pending',
-      joinDate: '2024-01-13',
-      eventsCount: 0,
-      lastActive: '2024-01-19 03:45 PM'
-    },
-    {
-      id: 4,
-      name: 'Emily Davis',
-      email: 'emily.d@email.com',
-      role: 'attendee',
-      status: 'suspended',
-      joinDate: '2024-01-12',
-      eventsCount: 8,
-      lastActive: '2024-01-18 11:20 AM'
-    }
-  ];
-
-  const recentEvents = [
-    {
-      id: 1,
-      title: 'Tech Conference 2024',
-      organizer: 'John Smith',
-      date: '2024-02-15',
-      location: 'San Francisco, CA',
-      attendees: 250,
-      revenue: 25000,
-      status: 'upcoming'
-    },
-    {
-      id: 2,
-      title: 'Music Festival',
-      organizer: 'Sarah Johnson',
-      date: '2024-01-20',
-      location: 'Los Angeles, CA',
-      attendees: 500,
-      revenue: 50000,
-      status: 'completed'
-    },
-    {
-      id: 3,
-      title: 'Startup Meetup',
-      organizer: 'Mike Wilson',
-      date: '2024-02-01',
-      location: 'New York, NY',
-      attendees: 100,
-      revenue: 10000,
-      status: 'active'
-    }
-  ];
-
-  const analytics = {
-    userGrowth: [1200, 1350, 1420, 1580, 1650, 1800, 1950, 2100, 2250, 2400, 2550, 2700],
-    revenueGrowth: [150000, 180000, 200000, 220000, 240000, 260000, 280000, 300000, 320000, 340000, 360000, 380000],
-    eventCategories: [
-      { name: 'Technology', value: 35, color: '#3B82F6' },
-      { name: 'Music', value: 25, color: '#10B981' },
-      { name: 'Business', value: 20, color: '#F59E0B' },
-      { name: 'Education', value: 15, color: '#EF4444' },
-      { name: 'Other', value: 5, color: '#8B5CF6' }
-    ]
-  };
-
-  const filteredUsers = recentUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-    return matchesSearch && matchesRole && matchesStatus;
+  const [dashboard, setDashboard] = useState(null);
+  const [directory, setDirectory] = useState({ colleges: [], departments: [], committees: [] });
+  const [loading, setLoading] = useState(true);
+  const [invite, setInvite] = useState({
+    collegeId: '',
+    departmentId: '',
+    role: ROLE_VALUES.STUDENT,
+    email: '',
+    expiry: '',
   });
+  const [createdCode, setCreatedCode] = useState('');
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'pending': return 'bg-yellow-500';
-      case 'suspended': return 'bg-red-500';
-      default: return 'bg-gray-500';
+  const selectedDepartments = useMemo(
+    () =>
+      directory.departments.filter((department) => {
+        if (!invite.collegeId) return true;
+        const collegeId = department.collegeId?._id || department.collegeId;
+        return String(collegeId) === String(invite.collegeId);
+      }),
+    [directory.departments, invite.collegeId]
+  );
+
+  const fetchAdminData = async () => {
+    try {
+      const [dashboardRes, directoryRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_API}/admin/dashboard`, { withCredentials: true }),
+        axios.get(`${import.meta.env.VITE_API}/admin/directory`, { withCredentials: true }),
+      ]);
+
+      setDashboard(dashboardRes.data);
+      setDirectory(directoryRes.data);
+
+      const firstCollege = directoryRes.data.colleges?.[0]?._id || '';
+      const firstDepartment = directoryRes.data.departments?.[0]?._id || '';
+      setInvite((current) => ({
+        ...current,
+        collegeId: current.collegeId || firstCollege,
+        departmentId: current.departmentId || firstDepartment,
+      }));
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to load admin console');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case 'organizer': return 'bg-blue-500';
-      case 'attendee': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
+  const createInvite = async (event) => {
+    event.preventDefault();
+    setCreatedCode('');
+
+    try {
+      const payload = {
+        collegeId: invite.collegeId,
+        departmentId: invite.departmentId,
+        role: invite.role,
+        expiry: invite.expiry,
+        email: invite.email.trim() || undefined,
+      };
+
+      const endpoint = payload.email ? '/invite/email' : '/invite/create';
+      const res = await axios.post(`${import.meta.env.VITE_API}${endpoint}`, payload, { withCredentials: true });
+      setCreatedCode(res.data.invite?.code || '');
+      toast.success(payload.email ? 'Invite email sent' : 'Invite code created');
+      fetchAdminData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to create invite');
     }
   };
 
-  const getEventStatusColor = (status) => {
-    switch (status) {
-      case 'upcoming': return 'bg-blue-500';
-      case 'active': return 'bg-green-500';
-      case 'completed': return 'bg-gray-500';
-      default: return 'bg-gray-500';
-    }
+  const copyInvite = async () => {
+    if (!createdCode) return;
+    await navigator.clipboard.writeText(createdCode);
+    toast.success('Invite code copied');
   };
+
+  const counts = dashboard?.counts || {};
+  const tabs = [
+    { id: 'overview', label: isPlatformAdmin ? 'Platform Control' : 'College Control' },
+    { id: 'invites', label: 'Invite Powers' },
+    { id: 'events', label: 'Event Oversight' },
+    { id: 'people', label: 'People' },
+  ];
+
+  if (loading) {
+    return <div className="app-page text-blue-100">Loading admin console...</div>;
+  }
 
   return (
-    <div className="admin min-h-screen p-6 mx-auto px-24 text-white">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-blue-300 mb-2">Admin Dashboard</h1>
-        <p className="text-blue-200">Monitor and manage organizers and attendees</p>
+    <div className="app-page text-white">
+      <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(244,213,141,0.2),transparent_34%),linear-gradient(135deg,rgba(12,21,34,0.96),rgba(23,23,23,0.92))] p-6 shadow-2xl">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#f4d58d]">
+              {isPlatformAdmin ? 'Platform Admin' : 'College Admin'}
+            </p>
+            <h1 className="mt-3 text-4xl font-bold text-white">
+              {isPlatformAdmin ? 'Platform Command Center' : 'College Admin Console'}
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-blue-100/78">
+              {isPlatformAdmin
+                ? 'Audit every college, inspect platform-wide event activity, and create invites for any campus workspace.'
+                : 'Manage your college workspace, create role-based invites, and supervise every committee event in your college.'}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-blue-100">
+            <p className="text-xs uppercase tracking-[0.2em] text-blue-100/55">Current Scope</p>
+            <p className="mt-2 text-lg font-semibold text-white">{dashboard?.scope?.label || 'Admin scope'}</p>
+          </div>
+        </div>
+      </section>
+
+      <div className="mb-8 flex flex-wrap gap-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.id ? 'bg-[#f4d58d] text-[#171717]' : 'border border-white/10 bg-white/5 text-blue-100 hover:bg-white/10'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        {[
-          { id: 'overview', label: 'Overview', icon: BarChart3 },
-          { id: 'users', label: 'User Management', icon: Users },
-          { id: 'events', label: 'Event Monitoring', icon: Calendar },
-          { id: 'analytics', label: 'Analytics', icon: TrendingUp }
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                activeTab === tab.id 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-white">{stats.totalUsers.toLocaleString()}</p>
-                  <p className="text-blue-200">Total Users</p>
-                </div>
-                <Users className="w-10 h-10 text-blue-400" />
-              </div>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-white">{stats.totalOrganizers.toLocaleString()}</p>
-                  <p className="text-blue-200">Organizers</p>
-                </div>
-                <UserCheck className="w-10 h-10 text-green-400" />
-              </div>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-white">{stats.totalEvents.toLocaleString()}</p>
-                  <p className="text-blue-200">Total Events</p>
-                </div>
-                <Calendar className="w-10 h-10 text-purple-400" />
-              </div>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-white">₹{stats.totalRevenue.toLocaleString()}</p>
-                  <p className="text-blue-200">Total Revenue</p>
-                </div>
-                <DollarSign className="w-10 h-10 text-yellow-400" />
-              </div>
-            </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard icon={Building2} label="Colleges" value={counts.colleges || 0} tone="text-[#f4d58d]" />
+            <StatCard icon={Users} label="Users" value={counts.users || 0} tone="text-sky-300" />
+            <StatCard icon={CalendarDays} label="Events" value={counts.events || 0} tone="text-emerald-300" />
+            <StatCard icon={Ticket} label="Bookings" value={counts.bookings || 0} tone="text-rose-300" />
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <h3 className="text-lg font-semibold text-white mb-4">Event Status</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-blue-200">Active Events</span>
-                  <span className="font-semibold text-white">{stats.activeEvents}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-200">Completed Events</span>
-                  <span className="font-semibold text-white">{stats.completedEvents}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-200">Pending Events</span>
-                  <span className="font-semibold text-white">{stats.pendingEvents}</span>
-                </div>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
+              <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">Admin Powers</p>
+              <div className="mt-4 space-y-3 text-sm text-blue-100/80">
+                <p>{isPlatformAdmin ? 'Can view and invite across every college.' : 'Can view and invite inside assigned college.'}</p>
+                <p>Can manage events in scope, including lifecycle, visibility, bookings, check-in, and marketing.</p>
+                <p>Can issue student, organizer, or college-admin invites.</p>
               </div>
             </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <h3 className="text-lg font-semibold text-white mb-4">User Distribution</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-blue-200">Organizers</span>
-                  <span className="font-semibold text-white">{((stats.totalOrganizers / stats.totalUsers) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-200">Attendees</span>
-                  <span className="font-semibold text-white">{((stats.totalAttendees / stats.totalUsers) * 100).toFixed(1)}%</span>
-                </div>
-              </div>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-blue-200">New user registrations: <span className="text-white">+45 today</span></p>
-                <p className="text-blue-200">Events created: <span className="text-white">+12 today</span></p>
-                <p className="text-blue-200">Revenue generated: <span className="text-white">₹125,000 today</span></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Management Tab */}
-      {activeTab === 'users' && (
-        <div className="space-y-6">
-          {/* Filters */}
-          <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-              <select
-                className="px-4 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-              >
-                <option value="all">All Roles</option>
-                <option value="organizer">Organizers</option>
-                <option value="attendee">Attendees</option>
-              </select>
-              <select
-                className="px-4 py-2 rounded-lg border border-blue-400/20 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="suspended">Suspended</option>
-              </select>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-                <Download className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Users Table */}
-          <div className="glass rounded-lg shadow-xl border border-blue-400/20 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Events</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Last Active</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-200 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-800/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-white">{user.name}</div>
-                          <div className="text-sm text-blue-200">{user.email}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.status)}`}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {user.eventsCount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-200">
-                        {user.lastActive}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <button className="text-blue-400 hover:text-blue-300">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button className="text-green-400 hover:text-green-300">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button className="text-red-400 hover:text-red-300">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Event Monitoring Tab */}
-      {activeTab === 'events' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentEvents.map((event) => (
-              <div key={event.id} className="glass rounded-lg shadow-xl border border-blue-400/20 p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-semibold text-white">{event.title}</h3>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEventStatusColor(event.status)}`}>
-                    {event.status}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p className="text-blue-200 flex items-center gap-2">
-                    <UserCheck className="w-4 h-4" />
-                    {event.organizer}
-                  </p>
-                  <p className="text-blue-200 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    {event.date}
-                  </p>
-                  <p className="text-blue-200 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {event.location}
-                  </p>
-                  <p className="text-blue-200 flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    {event.attendees} attendees
-                  </p>
-                  <p className="text-blue-200 flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" />
-                    ₹{event.revenue.toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <button className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">
-                    View Details
-                  </button>
-                  <button className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Analytics Tab */}
-      {activeTab === 'analytics' && (
-        <div className="space-y-8">
-          {/* Charts Placeholder */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <h3 className="text-lg font-semibold text-white mb-4">User Growth</h3>
-              <div className="h-64 flex items-center justify-center">
-                <div className="text-center">
-                  <BarChart3 className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-                  <p className="text-blue-200">User growth chart will be displayed here</p>
-                </div>
-              </div>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-              <h3 className="text-lg font-semibold text-white mb-4">Revenue Trends</h3>
-              <div className="h-64 flex items-center justify-center">
-                <div className="text-center">
-                  <TrendingUp className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                  <p className="text-blue-200">Revenue trends chart will be displayed here</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Event Categories */}
-          <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20">
-            <h3 className="text-lg font-semibold text-white mb-4">Event Categories Distribution</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {analytics.eventCategories.map((category, index) => (
-                <div key={index} className="text-center">
-                  <div 
-                    className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center"
-                    style={{ backgroundColor: category.color }}
-                  >
-                    <span className="text-white font-bold">{category.value}%</span>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5 lg:col-span-2">
+              <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">Role Distribution</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {Object.entries(counts.usersByRole || {}).map(([entryRole, count]) => (
+                  <div key={entryRole} className="rounded-2xl bg-black/25 p-4">
+                    <p className="text-sm text-blue-100/70">{formatRole(entryRole)}</p>
+                    <p className="mt-2 text-2xl font-bold text-white">{count}</p>
                   </div>
-                  <p className="text-blue-200 text-sm">{category.name}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'invites' && (
+        <form onSubmit={createInvite} className="grid gap-5 rounded-[1.5rem] border border-white/10 bg-white/6 p-6 lg:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f4d58d]">Invite Management</p>
+            <h2 className="mt-2 text-2xl font-bold">Create scoped access</h2>
+            <p className="mt-3 text-sm leading-6 text-blue-100/75">
+              Generate an invite code, or add an email to send a one-use invitation. Organizers invited here gain event workspace access.
+            </p>
+            {createdCode && (
+              <button
+                type="button"
+                onClick={copyInvite}
+                className="mt-5 flex items-center gap-3 rounded-2xl border border-[#f4d58d]/40 bg-[#f4d58d]/10 px-4 py-3 text-left text-[#f4d58d]"
+              >
+                <ClipboardCopy className="h-5 w-5" />
+                <span className="font-mono text-lg font-bold tracking-[0.2em]">{createdCode}</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid gap-4">
+            <Select value={invite.collegeId} onValueChange={(value) => setInvite((current) => ({ ...current, collegeId: value, departmentId: '' }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select college" />
+              </SelectTrigger>
+              <SelectContent>
+                {directory.colleges.map((college) => (
+                  <SelectItem key={college._id} value={college._id}>{college.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={invite.departmentId} onValueChange={(value) => setInvite((current) => ({ ...current, departmentId: value }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedDepartments.map((department) => (
+                  <SelectItem key={department._id} value={department._id}>{department.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={invite.role} onValueChange={(value) => setInvite((current) => ({ ...current, role: value }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roleOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="email" placeholder="Optional email for direct invite" value={invite.email} onChange={(event) => setInvite((current) => ({ ...current, email: event.target.value }))} />
+            <Input type="datetime-local" value={invite.expiry} onChange={(event) => setInvite((current) => ({ ...current, expiry: event.target.value }))} required />
+            <Button type="submit" className="rounded-full bg-[#f4d58d] text-[#171717] hover:bg-[#ffe4a8]">
+              <Mail className="h-4 w-4" />
+              Create Invite
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {activeTab === 'events' && (
+        <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
+            <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">Lifecycle Control</p>
+            <div className="mt-4 space-y-3">
+              {Object.entries(counts.eventsByLifecycle || {}).map(([state, count]) => (
+                <div key={state} className="flex items-center justify-between rounded-2xl bg-black/25 px-4 py-3">
+                  <span className="text-blue-100/80">{lifecycleLabels[state] || state}</span>
+                  <span className="font-bold text-white">{count}</span>
                 </div>
               ))}
             </div>
           </div>
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
+            <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">Recent Managed Events</p>
+            <div className="mt-4 space-y-3">
+              {(dashboard?.recentEvents || []).map((event) => (
+                <div key={event._id} className="rounded-2xl bg-black/25 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="font-semibold text-white">{event.title}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[#f4d58d]">{event.visibilityScope}</p>
+                  </div>
+                  <p className="mt-2 text-sm text-blue-100/70">
+                    {event.collegeId?.name || 'Platform'} · {event.committeeId?.name || 'No committee'} · {lifecycleLabels[event.lifecycleState] || event.lifecycleState}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20 text-center">
-              <Activity className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-              <p className="text-2xl font-bold text-white">89%</p>
-              <p className="text-blue-200">User Engagement Rate</p>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20 text-center">
-              <Ticket className="w-12 h-12 text-green-400 mx-auto mb-4" />
-              <p className="text-2xl font-bold text-white">₹2.5M</p>
-              <p className="text-blue-200">Total Revenue</p>
-            </div>
-            <div className="glass p-6 rounded-lg shadow-xl border border-blue-400/20 text-center">
-              <Shield className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-              <p className="text-2xl font-bold text-white">99.9%</p>
-              <p className="text-blue-200">System Uptime</p>
-            </div>
+      {activeTab === 'people' && (
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-5">
+          <p className="text-sm uppercase tracking-[0.2em] text-blue-100/60">Recent Users</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {(dashboard?.recentUsers || []).map((member) => (
+              <div key={member._id} className="rounded-2xl bg-black/25 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f4d58d] text-[#171717]">
+                    {member.role === ROLE_VALUES.STUDENT ? <GraduationCap className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">{member.fullName || member.username}</p>
+                    <p className="text-sm text-blue-100/65">{member.email}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[#f4d58d]">{formatRole(member.role)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

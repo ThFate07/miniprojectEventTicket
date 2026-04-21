@@ -23,16 +23,44 @@ const Checkout = () => {
   const [ticketData, setTicketData] = useState(null); 
   const [showTicketOptions, setShowTicketOptions] = useState(false); // 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const hasCompletedBooking = Boolean(ticketData && showTicketOptions);
   const isGeneral = isGeneralAdmission || eventData?.seats?.type === 'general' || event?.seats?.type === 'general';
   const selectionLabel = isGeneral ? `${selectedSeats.length} General Admission` : selectedSeats.join(', ');
   const selectionCountLabel = isGeneral ? 'Tickets' : 'Seats';
+  const seatPrice = ticketCost || Number(event?.cost || 0);
+  const isFreeEvent = seatPrice === 0;
+  const convenienceFee = isFreeEvent ? 0 : 50;
+  const finalTotal = selectedSeats.length * seatPrice + convenienceFee;
+
   const handlePayment = async () => {
     setIsProcessingPayment(true);
+    if (isFreeEvent) {
+      try {
+        const ticket = await axios.post(`${import.meta.env.VITE_API}/events/book-ticket`, {
+          event_id: id,
+          booking_dateTime: new Date().toISOString(),
+          seats: selectedSeats.join(','),
+          payment_id: 'FREE',
+          paymentAmt: 0
+        });
+
+        toast.success(ticket.data.message);
+        setTicketData(ticket.data.booking);
+        setShowTicketOptions(true);
+        toast.success('Your ticket is ready to download or share.');
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Unable to complete registration.');
+      } finally {
+        setIsProcessingPayment(false);
+      }
+      return;
+    }
+
     try {
       const res = await axios.post(`${import.meta.env.VITE_API}/payment/order`, {
         amount: finalTotal
       });
-      console.log(res.data);
+      toast.success('Payment window is ready.');
       handlePaymentVerify(res.data.data)
     } catch (error) {
       console.log(error);
@@ -43,13 +71,12 @@ const Checkout = () => {
   const handlePaymentVerify = async (data) => {
     try {
       const seatCheckEndpoint = isGeneral ? 'check-seats' : 'check-seats-with-locks';
-      let checkSeats = await axios.post(`${import.meta.env.VITE_API}/events/${seatCheckEndpoint}` , {
+      await axios.post(`${import.meta.env.VITE_API}/events/${seatCheckEndpoint}` , {
         event_id : id,
         seats : selectedSeats
       });
-      console.log(checkSeats)
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || 'Unable to confirm seat availability.');
       setIsProcessingPayment(false);
       return;
     }
@@ -57,17 +84,17 @@ const Checkout = () => {
       key: import.meta.env.VITE_RAZORPAY_KEY,
       amount: data.amount,
       currency: data.currency,
-      name: "Host My Show",
+      name: "Book My Event",
       description: "Test Mode",
       order_id: data.id,
       handler: async (response) => {
-        console.log("Payment verify response : ", response)
         try {
           await axios.post(`${import.meta.env.VITE_API}/payment/verify`, {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
+          toast.success('Payment verified successfully.');
           
           const ticket = await axios.post(`${import.meta.env.VITE_API}/events/book-ticket`, {
             event_id: id,
@@ -87,9 +114,10 @@ const Checkout = () => {
             toast.success(ticket.data.message);
             setTicketData(ticket.data.booking); // Save ticket data
             setShowTicketOptions(true); // Show download/share buttons
+            toast.success('Your ticket is ready to download or share.');
           }
         } catch (error) {
-          toast.error(error.response.data.message);
+          toast.error(error.response?.data?.message || 'Unable to complete payment verification.');
         } finally {
           setIsProcessingPayment(false);
         }
@@ -112,13 +140,11 @@ const Checkout = () => {
     }
 
     const fetchEvent = async () => {
-      console.log(id);
       try {
         const response = await axios.get(`${import.meta.env.VITE_API}/events/get-events/${id}`);
-        console.log(response.data)
         setEvent(response.data.event);
       } catch (error) {
-        console.log(error)
+        toast.error(error.response?.data?.message || 'Unable to load event details for checkout.');
       }
     };
 
@@ -128,10 +154,6 @@ const Checkout = () => {
   if (!location.state) {
     return null;
   }
-  
-  const seatPrice = ticketCost || 350;
-  const convenienceFee = 50;
-  const finalTotal = selectedSeats.length * seatPrice + convenienceFee;
 
   const formatDate = (date) => {
     const dateObj = new Date(date);
@@ -140,13 +162,18 @@ const Checkout = () => {
     const year = dateObj.getFullYear();
     return `${day}/${month}/${year}`;
   }
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (!ticketData) {
       toast.error('Ticket details are not available yet.');
       return;
     }
 
-    downloadTicketPdf({ booking: ticketData, event });
+    try {
+      await downloadTicketPdf({ booking: ticketData, event });
+      toast.success('Ticket PDF download started.');
+    } catch (error) {
+      toast.error(error.message || 'Unable to generate ticket PDF.');
+    }
   };
 
   const sharePDF = async () => {
@@ -177,7 +204,7 @@ const Checkout = () => {
           <div className="flex-1 text-center md:text-left">
             <h3 className="mb-1.5 text-lg font-bold text-white sm:mb-2 sm:text-2xl">{event.title}</h3>
             <p className="text-blue-200 text-sm flex items-center justify-center md:justify-start gap-2 mb-1">
-              <Calendar className="w-4 h-4" /> {formatDate(event.eventDateTime)}
+              <Calendar className="w-4 h-4" /> {formatDate(Array.isArray(event.eventDateTime) ? event.eventDateTime[0] : event.eventDateTime)}
             </p>
             <p className="text-blue-200 text-sm flex items-center justify-center md:justify-start gap-2 mb-1">
               <MapPin className="w-4 h-4" /> {event.location}
@@ -215,35 +242,47 @@ const Checkout = () => {
           </div>
         </div>
 
-        <div className="w-full rounded-[1.6rem] border border-white/10 bg-white/5 p-3.5 backdrop-blur sm:p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f4d58d] sm:text-sm">Secure checkout</p>
-              <p className="mt-1.5 text-sm leading-5 text-blue-100/85 sm:mt-2 sm:leading-6">
-                Review looks complete. Continue once to open Razorpay and finish the booking securely.
-              </p>
+        {!hasCompletedBooking ? (
+          <div className="w-full rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-3.5 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f4d58d] sm:text-sm">Secure checkout</p>
+                <p className="mt-1.5 text-sm leading-5 text-blue-100/85 sm:mt-2 sm:leading-6">
+                  {isFreeEvent
+                    ? 'This is a free event, so we will complete the registration directly after one final confirmation.'
+                    : 'Review looks complete. Continue once to open Razorpay and finish the booking securely.'}
+                </p>
+              </div>
+              <div className="rounded-full border border-white/10 bg-black/20 px-4 py-1.5 text-sm text-white/85">
+                Payable now: ₹{finalTotal}
+              </div>
             </div>
-            <div className="rounded-full border border-white/10 bg-black/20 px-4 py-1.5 text-sm text-white/85">
-              Payable now: ₹{finalTotal}
+
+            <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+              <Button
+                onClick={handlePayment}
+                disabled={isProcessingPayment}
+                className="h-11 w-full rounded-full bg-[#fff3dd] px-6 text-sm font-semibold text-[#1c1917] shadow-[0_18px_45px_rgba(0,0,0,0.28)] transition-all duration-300 hover:bg-[#ffe2b3] disabled:cursor-not-allowed disabled:bg-[#f1dfbf] disabled:text-[#5b534a] sm:h-12 sm:text-base"
+              >
+                {isProcessingPayment ? (isFreeEvent ? 'Completing registration...' : 'Preparing payment...') : isFreeEvent ? 'Confirm Free Registration' : 'Proceed to Payment'}
+                {!isProcessingPayment && <ArrowRight className="h-4 w-4" />}
+              </Button>
+
+              <div className="flex items-center justify-center gap-2 text-center text-[11px] uppercase tracking-[0.18em] text-blue-100/70 sm:text-xs">
+                <ShieldCheck className="h-4 w-4 text-[#2cc4b0]" />
+                Verified payment gateway and seat confirmation before charge
+              </div>
             </div>
           </div>
-
-          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
-            <Button
-              onClick={handlePayment}
-              disabled={isProcessingPayment}
-              className="h-11 w-full rounded-full bg-[#fff3dd] px-6 text-sm font-semibold text-[#1c1917] shadow-[0_18px_45px_rgba(0,0,0,0.28)] transition-all duration-300 hover:bg-[#ffe2b3] disabled:cursor-not-allowed disabled:bg-[#f1dfbf] disabled:text-[#5b534a] sm:h-12 sm:text-base"
-            >
-              {isProcessingPayment ? 'Preparing payment...' : 'Proceed to Payment'}
-              {!isProcessingPayment && <ArrowRight className="h-4 w-4" />}
-            </Button>
-
-            <div className="flex items-center justify-center gap-2 text-center text-[11px] uppercase tracking-[0.18em] text-blue-100/70 sm:text-xs">
-              <ShieldCheck className="h-4 w-4 text-[#2cc4b0]" />
-              Verified payment gateway and seat confirmation before charge
-            </div>
+        ) : (
+          <div className="w-full rounded-[1.6rem] border border-emerald-300/20 bg-[linear-gradient(180deg,rgba(34,197,94,0.12),rgba(255,255,255,0.05))] p-4 sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">Registration confirmed</p>
+            <h3 className="mt-2 text-xl font-bold text-white">Your booking is complete.</h3>
+            <p className="mt-2 text-sm leading-6 text-blue-100/85">
+              Your ticket is ready below, so there is nothing else left to confirm on this page.
+            </p>
           </div>
-        </div>
+        )}
 
         {showTicketOptions && (
           <div className="mt-6 grid w-full gap-3 sm:mt-8 sm:grid-cols-2">

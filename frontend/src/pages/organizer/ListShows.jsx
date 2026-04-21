@@ -89,6 +89,14 @@ const ListShows = () => {
                   {show.status?.charAt(0).toUpperCase() + show.status?.slice(1)}
                 </span>
               </div>
+              <div className="flex justify-between items-center text-sm mb-2">
+                <span className="text-blue-200">Lifecycle:</span>
+                <span className="font-semibold text-white">{show.lifecycleState || 'tentative'}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mb-4">
+                <span className="text-blue-200">Visibility:</span>
+                <span className="font-semibold text-white">{show.visibilityScope || 'global'}</span>
+              </div>
               <div className="flex justify-between items-center text-sm mb-4">
                 <span className="text-blue-200">Bookings:</span>
                 <span className="font-semibold text-white">{show.totalBookings}</span>

@@ -1,11 +1,8 @@
 import { connectDB } from "./utils/connectDB.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import dotenv from "dotenv";
 import app from "./app.js";
 import { allowedOrigins } from "./utils/cors.js";
-
-dotenv.config();
 
 //cron file import
 import "./cron/updatedEventsStatus.js" 

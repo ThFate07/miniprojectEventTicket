@@ -5,6 +5,13 @@ import crypto from 'crypto'
 const createOrder = asyncHandler(async (req , res) => {
     const { amount } = req.body;
 
+    if (!amount || Number(amount) <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "A positive payment amount is required."
+        });
+    }
+
     if (!razorpayInstance) {
         return res.status(503).json({
             success: false,

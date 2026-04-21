@@ -1,11 +1,11 @@
 import express from "express"
-import dotenv from "dotenv"
 import cors from "cors"
 import cookieParser from "cookie-parser";
 import { corsOptions } from "./utils/cors.js";
+import { loadEnv } from "./utils/loadEnv.js";
 
 //Express Setup 
-dotenv.config();
+loadEnv();
 const app = express();
 app.use(express.json());
 
@@ -51,6 +51,12 @@ app.use("/api/events" , eventsRouter);
 
 import paymentRouter from "./routes/payment.routes.js"
 app.use("/api/payment" , paymentRouter)
+
+import inviteRouter from "./routes/invite.routes.js"
+app.use("/api/invite" , inviteRouter)
+
+import adminRouter from "./routes/admin.routes.js"
+app.use("/api/admin" , adminRouter)
 
 import reviewRouter from "./routes/reveiw.routes.js"
 app.use("/api/review" , reviewRouter);

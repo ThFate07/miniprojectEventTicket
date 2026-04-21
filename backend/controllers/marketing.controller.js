@@ -2,12 +2,16 @@ import { Event } from "../models/events.model.js";
 import { User } from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { eventMarketingFormat, mail } from "../utils/email.js";
+import { canManageEvent, ROLE_VALUES } from "../utils/eventAccess.js";
 
 const getEmailList = asyncHandler(async (req, res) => {
-  const users = await User.find({ role: "Attendee" }).select("email");
-  console.log(users);
+  const query =
+    req.user.role === ROLE_VALUES.PLATFORM_ADMIN
+      ? { role: ROLE_VALUES.STUDENT }
+      : { role: ROLE_VALUES.STUDENT, collegeId: req.user.collegeId };
+  const users = await User.find(query).select("email");
   return res.status(200).send({
-    message: "Emails of Attendee",
+    message: "Emails of students",
     success: true,
     users,
   });
@@ -20,6 +24,13 @@ const sendBulkEmails = asyncHandler(async (req, res) => {
     return res.status(404).json({
       success: false,
       message: "Event not found"
+    });
+  }
+
+  if (!canManageEvent(req.user, event)) {
+    return res.status(403).json({
+      success: false,
+      message: "You are not allowed to market this event",
     });
   }
 

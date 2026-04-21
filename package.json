@@ -1,6 +1,6 @@
 {
-  "name": "host-my-show",
-  "displayName": "Host My Show",
+  "name": "book-my-event",
+  "displayName": "Book My Event",
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",

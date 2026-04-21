@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { userStore } from "@/context/userContext";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { getPostLoginRoute } from "@/lib/auth";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -36,7 +37,7 @@ const Login = () => {
       );
       toast.success(response.data.message);
       await login(response.data.user);
-      navigate("/");
+      navigate(getPostLoginRoute(response.data.user));
     } catch (error) {
       console.log(error);
       toast.error(error.response.data.message);
@@ -56,7 +57,7 @@ const Login = () => {
 
   return (
     <div className="min-h-[90vh] flex items-center justify-center p-4 pt-12 px-8">
-      <div className="relative backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-10 shadow-2xl w-[960px] flex justify-between gap-24">
+      <div className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] border border-white/10 rounded-3xl p-10 shadow-2xl w-[960px] flex justify-between gap-24">
         <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 rounded-3xl"></div>
 
         {/* Left side - Illustration */}
@@ -82,7 +83,7 @@ const Login = () => {
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl backdrop-blur-sm"
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl"
               placeholder="Email"
               type="email"
               required
@@ -91,7 +92,7 @@ const Login = () => {
               name="password"
               value={formData.password}
               onChange={handleInputChange}
-              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl backdrop-blur-sm"
+              className="text-white h-14 placeholder:text-white/50 text-lg w-full border-white/30 bg-white/10 rounded-xl"
               placeholder="Password"
               type="password"
               required

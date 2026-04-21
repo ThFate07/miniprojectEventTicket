@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Camera, ImageUp, RefreshCw, ShieldCheck, Ticket, TriangleAlert } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -244,28 +246,29 @@ const ScanEntry = () => {
               <label htmlFor="event-select" className="mb-2 block text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
                 Event Scope
               </label>
-              <select
-                id="event-select"
-                className="w-full rounded-xl border border-blue-400/20 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-blue-400 lg:min-w-80"
-                value={selectedEvent}
-                onChange={(e) => setSelectedEvent(e.target.value)}
-              >
-                <option value="">All my events</option>
-                {events.map((eventItem) => (
-                  <option key={eventItem._id} value={eventItem._id}>
-                    {eventItem.title}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedEvent || '__all__'} onValueChange={(value) => setSelectedEvent(value === '__all__' ? '' : value)}>
+                <SelectTrigger id="event-select" className="lg:min-w-80">
+                  <SelectValue placeholder="All my events" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All my events</SelectItem>
+                  {events.map((eventItem) => (
+                    <SelectItem key={eventItem._id} value={eventItem._id}>
+                      {eventItem.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <button
+            <Button
               type="button"
               onClick={handleRestartCamera}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20 sm:w-auto"
+              variant="outline"
+              className="w-full sm:w-auto"
             >
               <RefreshCw className="h-4 w-4" /> Restart Camera
-            </button>
+            </Button>
           </div>
 
           <div className="relative overflow-hidden rounded-3xl border border-blue-400/20 bg-slate-950/60">
