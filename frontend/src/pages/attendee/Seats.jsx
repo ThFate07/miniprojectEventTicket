@@ -565,7 +565,7 @@ const Seats = () => {
           {/* Selected Seats and Total */}
           <div className="mt-8 w-full rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-center">
             <p className="text-base text-gray-300 sm:text-lg">{isGeneralAdmission ? 'Selected Tickets' : 'Selected Seats'}: <span className="font-semibold text-white">{isGeneralAdmission ? selectedSeats.length || 'None' : selectedSeats.join(', ') || 'None'}</span></p>
-            <p className="mt-2 text-base text-gray-300 sm:text-lg">Total: <span className="font-semibold text-white">₹{selectedSeats.length * ticketCost}</span></p>
+            <p className="mt-2 text-base text-gray-300 sm:text-lg">Total: <span className="font-semibold text-white">{ticketCost === 0 ? 'Free' : `₹${selectedSeats.length * ticketCost}`}</span></p>
           </div>
 
           {/* Proceed Button */}

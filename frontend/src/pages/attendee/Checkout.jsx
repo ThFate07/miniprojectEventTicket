@@ -226,11 +226,11 @@ const Checkout = () => {
             </div>
             <div className="flex items-center justify-between gap-4 text-sm text-blue-200 sm:text-base">
               <span>Price per {isGeneral ? 'ticket' : 'seat'}</span>
-              <span className="font-semibold text-white">₹{seatPrice}</span>
+              <span className="font-semibold text-white">{isFreeEvent ? 'Free' : `₹${seatPrice}`}</span>
             </div>
             <div className="flex items-center justify-between gap-4 text-sm text-blue-200 sm:text-base">
               <span>Convenience Fee</span>
-              <span className="font-semibold text-white">₹{convenienceFee}</span>
+              <span className="font-semibold text-white">{convenienceFee === 0 ? 'Free' : `₹${convenienceFee}`}</span>
             </div>
           </div>
 

@@ -118,7 +118,7 @@ const ShowDetails = () => {
           </div>
           <div className="flex items-center gap-3 text-base sm:text-lg">
             <DollarSign className="w-6 h-6 text-green-400" />
-            <span>Cost: ₹{event.cost}</span>
+            <span>Cost: {Number(event.cost || 0) === 0 ? 'Free' : `₹${Number(event.cost || 0).toLocaleString()}`}</span>
           </div>
           <div className="flex items-center gap-3 text-base sm:text-lg">
             <Users className="w-6 h-6 text-purple-400" />
@@ -145,8 +145,11 @@ const ShowDetails = () => {
           <p className="text-lg text-blue-200">Total Seats: {event.seatMap?.length || event.seats?.value || 'N/A'}</p>
         )}
         <p className="text-lg text-blue-200">Status: <span className="font-semibold">{event.status?.charAt(0).toUpperCase() + event.status?.slice(1)}</span></p>
-        <p className="text-lg text-blue-200">Tentative Date: <span className="font-semibold">{event.tentativeDate ? new Date(event.tentativeDate).toLocaleDateString('en-IN') : 'N/A'}</span></p>
-        <p className="text-lg text-blue-200">Final Date: <span className="font-semibold">{event.finalDate ? new Date(event.finalDate).toLocaleDateString('en-IN') : 'Not finalized yet'}</span></p>
+        <p className="text-lg text-blue-200">
+          Scheduled Date:
+          <span className="font-semibold"> {event.eventDateTime?.[0] ? new Date(event.eventDateTime[0]).toLocaleDateString('en-IN') : 'N/A'}</span>
+        </p>
+        <p className="text-lg text-blue-200">Organizer Note: <span className="font-semibold">Event details remain editable from the dashboard.</span></p>
 
         <div className="mt-8 text-center">
           <Link to="/organizer/list-shows">

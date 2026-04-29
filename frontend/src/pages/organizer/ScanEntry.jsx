@@ -5,6 +5,46 @@ import { Camera, ImageUp, RefreshCw, ShieldCheck, Ticket, TriangleAlert } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 
+const normalizeDecodedQrData = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
+};
+
+const getScannerErrorMessage = (error, phase = 'scan') => {
+  const rawMessage = typeof error === 'string' ? error : error?.message || '';
+  const normalizedMessage = rawMessage.trim();
+  const lowerMessage = normalizedMessage.toLowerCase();
+
+  if (!normalizedMessage) {
+    return phase === 'camera'
+      ? 'Unable to access the camera. Check browser permission and try again.'
+      : 'We could not read a QR code from that image. Try a sharper screenshot or crop closer to the QR.';
+  }
+
+  if (lowerMessage.includes('no qr code found')) {
+    return phase === 'camera'
+      ? 'No QR code is visible yet. Hold the ticket steady, reduce glare, and keep the code inside the scan box.'
+      : 'No QR code was detected in the uploaded image. Try a clearer screenshot or crop closer to the QR.';
+  }
+
+  if (lowerMessage.includes('camera not found')) {
+    return 'No camera was found on this device. You can still scan from an uploaded image.';
+  }
+
+  if (lowerMessage.includes('permission') || lowerMessage.includes('denied') || lowerMessage.includes('notallowederror')) {
+    return 'Camera permission was denied. Allow camera access in the browser and try again.';
+  }
+
+  if (lowerMessage.includes('could not be decoded')) {
+    return 'The QR was detected but its contents could not be decoded. Try the original ticket image or a clearer screenshot.';
+  }
+
+  return normalizedMessage;
+};
+
 const formatDateTime = (value) => {
   if (!value) {
     return 'Not available';
@@ -31,11 +71,17 @@ const ScanEntry = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [lastScan, setLastScan] = useState(null);
   const [lastError, setLastError] = useState('');
+  const [acceptedScan, setAcceptedScan] = useState(null);
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
   const qrScannerRef = useRef(null);
+  const decodeLoopRef = useRef(null);
+  const acceptedScanTimeoutRef = useRef(null);
   const scanCooldownRef = useRef(false);
+  const isVerifyingRef = useRef(false);
+  const isDecodingRef = useRef(false);
   const selectedEventRef = useRef('');
+  const lastHandledQrRef = useRef({ value: '', until: 0 });
 
   useEffect(() => {
     selectedEventRef.current = selectedEvent;
@@ -55,6 +101,80 @@ const ScanEntry = () => {
     qrScannerRef.current = QrScanner;
 
     return QrScanner;
+  };
+
+  const showAcceptedScan = (booking) => {
+    if (acceptedScanTimeoutRef.current) {
+      window.clearTimeout(acceptedScanTimeoutRef.current);
+    }
+
+    setAcceptedScan(booking);
+    acceptedScanTimeoutRef.current = window.setTimeout(() => {
+      setAcceptedScan(null);
+    }, 3200);
+  };
+
+  const decodeQrFromImageSource = async (QrScanner, source, { returnDetailedResult = false } = {}) => {
+    const scanAttempts = [
+      {
+        returnDetailedScanResult: true,
+        alsoTryWithoutScanRegion: true,
+      },
+      {
+        returnDetailedScanResult: true,
+        scanRegion: null,
+        alsoTryWithoutScanRegion: true,
+      },
+    ];
+
+    let lastError = null;
+
+    for (const options of scanAttempts) {
+      try {
+        const result = await QrScanner.scanImage(source, options);
+        if (returnDetailedResult) {
+          return typeof result === 'string' ? { data: result } : result;
+        }
+
+        return typeof result === 'string' ? result : result.data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('No QR code found');
+  };
+
+  const tryDecodeCurrentVideoFrame = async (QrScanner) => {
+    if (!videoRef.current || scanCooldownRef.current || isVerifyingRef.current || isDecodingRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+
+    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      return;
+    }
+
+    isDecodingRef.current = true;
+
+    try {
+      const result = await decodeQrFromImageSource(QrScanner, video, { returnDetailedResult: true });
+      const decodedValue = typeof result === 'string' ? result : result?.data;
+
+      if (decodedValue) {
+        setCameraStatus('QR detected. Validating ticket...');
+        await verifyTicket(decodedValue);
+      }
+    } catch (error) {
+      const message = getScannerErrorMessage(error, 'camera');
+
+      if (!message.startsWith('No QR code is visible yet')) {
+        setCameraStatus(message);
+      }
+    } finally {
+      isDecodingRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -79,11 +199,28 @@ const ScanEntry = () => {
   }, []);
 
   const verifyTicket = async (rawQrData) => {
-    if (scanCooldownRef.current) {
+    const normalizedQrData = normalizeDecodedQrData(rawQrData);
+    const now = Date.now();
+    let acceptedCooldownMs = 1800;
+
+    if (!normalizedQrData) {
+      const message = 'The scanned QR was empty. Try again with the ticket centered and fully visible.';
+      setLastError(message);
+      setCameraStatus('Scan failed. No QR payload was read.');
+      toast.error(message);
+      return;
+    }
+
+    if (
+      scanCooldownRef.current ||
+      isVerifyingRef.current ||
+      (lastHandledQrRef.current.value === normalizedQrData && lastHandledQrRef.current.until > now)
+    ) {
       return;
     }
 
     scanCooldownRef.current = true;
+    isVerifyingRef.current = true;
     setIsVerifying(true);
     setLastError('');
 
@@ -91,14 +228,21 @@ const ScanEntry = () => {
       const response = await axios.post(
         `${import.meta.env.VITE_API}/events/validate-ticket-entry`,
         {
-          qrData: rawQrData,
+          qrData: normalizedQrData,
           eventId: selectedEventRef.current || undefined,
         },
         { withCredentials: true }
       );
 
       setLastScan(response.data.booking);
+      setLastError('');
+      showAcceptedScan(response.data.booking);
       setCameraStatus('Ticket validated. Ready for the next attendee.');
+      lastHandledQrRef.current = {
+        value: normalizedQrData,
+        until: Date.now() + 6000,
+      };
+      acceptedCooldownMs = 3200;
       toast.success(response.data.message || 'Ticket checked in successfully');
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to validate ticket';
@@ -109,10 +253,11 @@ const ScanEntry = () => {
       setCameraStatus('Scan failed. Check the message and try again.');
       toast.error(message);
     } finally {
+      isVerifyingRef.current = false;
       setIsVerifying(false);
       window.setTimeout(() => {
         scanCooldownRef.current = false;
-      }, 1800);
+      }, acceptedCooldownMs);
     }
   };
 
@@ -123,10 +268,20 @@ const ScanEntry = () => {
 
     let disposed = false;
     let scanner;
+    let qrScannerInstance;
+
+    const runDecodeFallback = async () => {
+      if (!qrScannerInstance) {
+        return;
+      }
+
+      await tryDecodeCurrentVideoFrame(qrScannerInstance);
+    };
 
     const startScanner = async () => {
       try {
         const QrScanner = await loadQrScanner();
+        qrScannerInstance = QrScanner;
 
         if (disposed || !videoRef.current) {
           return;
@@ -139,8 +294,31 @@ const ScanEntry = () => {
             verifyTicket(rawValue);
           },
           {
+            onDecodeError: (error) => {
+              const message = getScannerErrorMessage(error, 'camera');
+
+              if (message.startsWith('No QR code is visible yet')) {
+                return;
+              }
+
+              setCameraStatus(message);
+            },
+            calculateScanRegion: (video) => {
+              const edge = Math.round(Math.min(video.videoWidth, video.videoHeight) * 0.82);
+              const x = Math.max(0, Math.round((video.videoWidth - edge) / 2));
+              const y = Math.max(0, Math.round((video.videoHeight - edge) / 2));
+
+              return {
+                x,
+                y,
+                width: edge,
+                height: edge,
+                downScaledWidth: 900,
+                downScaledHeight: 900,
+              };
+            },
             preferredCamera: 'environment',
-            highlightScanRegion: true,
+            highlightScanRegion: false,
             highlightCodeOutline: true,
             returnDetailedScanResult: true,
             maxScansPerSecond: 5,
@@ -148,7 +326,12 @@ const ScanEntry = () => {
         );
 
         scannerRef.current = scanner;
+        scanner.setInversionMode('both');
         await scanner.start();
+
+        decodeLoopRef.current = window.setInterval(() => {
+          runDecodeFallback();
+        }, 900);
 
         if (disposed) {
           return;
@@ -161,7 +344,9 @@ const ScanEntry = () => {
           return;
         }
 
-        setCameraError(error.message || 'Unable to access the camera');
+        const message = getScannerErrorMessage(error, 'camera');
+
+        setCameraError(message);
         setCameraStatus('Camera unavailable. You can still scan from an uploaded image.');
       }
     };
@@ -174,6 +359,15 @@ const ScanEntry = () => {
         scanner.stop();
         scanner.destroy();
       }
+      if (decodeLoopRef.current) {
+        window.clearInterval(decodeLoopRef.current);
+        decodeLoopRef.current = null;
+      }
+      if (acceptedScanTimeoutRef.current) {
+        window.clearTimeout(acceptedScanTimeoutRef.current);
+        acceptedScanTimeoutRef.current = null;
+      }
+      setAcceptedScan(null);
       scannerRef.current = null;
     };
   }, []);
@@ -190,17 +384,15 @@ const ScanEntry = () => {
 
     try {
       const QrScanner = await loadQrScanner();
-      const result = await QrScanner.scanImage(file, {
-        returnDetailedScanResult: true,
-      });
-      const rawValue = typeof result === 'string' ? result : result.data;
+      const rawValue = await decodeQrFromImageSource(QrScanner, file);
 
       await verifyTicket(rawValue);
     } catch (error) {
-      const message = error.message || 'No QR code was detected in the uploaded image';
+      const message = getScannerErrorMessage(error, 'image');
 
       setLastScan(null);
       setLastError(message);
+      setCameraStatus('Image scan failed. Review the error and try another screenshot.');
       toast.error(message);
     } finally {
       setIsVerifying(false);
@@ -218,7 +410,7 @@ const ScanEntry = () => {
       setCameraError('');
       setCameraStatus('Camera restarted. Ready to scan.');
     } catch (error) {
-      const message = error.message || 'Unable to restart the camera';
+      const message = getScannerErrorMessage(error, 'camera');
 
       setCameraError(message);
       setCameraStatus('Camera restart failed. Use image upload as fallback.');
@@ -273,9 +465,29 @@ const ScanEntry = () => {
 
           <div className="relative overflow-hidden rounded-3xl border border-blue-400/20 bg-slate-950/60">
             <video ref={videoRef} className="h-[280px] w-full object-cover sm:h-[360px] lg:h-[420px]" muted playsInline />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-40 w-40 rounded-[2rem] border-2 border-dashed border-emerald-300/75 shadow-[0_0_40px_rgba(52,211,153,0.18)] sm:h-48 sm:w-48 lg:h-56 lg:w-56" />
-            </div>
+            {acceptedScan && (
+              <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-3xl border border-emerald-300/40 bg-slate-950/88 p-4 shadow-[0_12px_40px_rgba(16,185,129,0.22)] backdrop-blur-sm sm:inset-x-6 sm:bottom-6 sm:p-5">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <ShieldCheck className="h-4 w-4" /> Entry Accepted
+                </div>
+                <div className="grid gap-2 text-sm text-white/90 sm:grid-cols-2">
+                  <div>
+                    <span className="text-emerald-200">Attendee:</span> {acceptedScan.attendeeName}
+                  </div>
+                  {acceptedScan.attendeeEmail && (
+                    <div>
+                      <span className="text-emerald-200">Email:</span> {acceptedScan.attendeeEmail}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-emerald-200">Event:</span> {acceptedScan.eventTitle}
+                  </div>
+                  <div>
+                    <span className="text-emerald-200">Seats:</span> {acceptedScan.seats}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -339,7 +551,7 @@ const ScanEntry = () => {
               Entry Guardrail
             </div>
             <p className="text-sm text-white/85">
-              {lastError || 'Only signed tickets created by this backend are accepted. Reused or tampered QR codes are rejected.'}
+              {lastError || 'Signed and supported legacy tickets can be checked in here. Reused, tampered, wrong-event, or unmatched tickets are rejected with a specific reason.'}
             </p>
           </div>
         </section>

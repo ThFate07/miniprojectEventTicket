@@ -31,6 +31,8 @@ const ChatBot = lazy(() => import('./pages/ChatBot'));
 
 axios.defaults.withCredentials = true;
 
+const API_BASE_URL = import.meta.env.VITE_API || 'http://localhost:8000/api';
+
 const ProtectedOrganizerRoute = ({ children }) => {
   const isAuth = userStore((state) => state.isAuth);
   const user = userStore((state) => state.user);
@@ -93,7 +95,7 @@ const App = () => {
 
   const start = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API}/start`, { withCredentials: false });
+      const res = await axios.get(`${API_BASE_URL}/start`, { withCredentials: false });
       console.log(res.data);
       if (res.data.success) {
         setBackend(true);

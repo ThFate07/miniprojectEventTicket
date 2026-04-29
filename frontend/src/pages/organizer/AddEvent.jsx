@@ -20,6 +20,8 @@ const ticketingModes = ['assigned', 'general'];
 const visibilityOptions = ['department', 'college', 'global'];
 
 const getTrimmedImages = (images) => images.map((image) => image.trim()).filter(Boolean);
+const requiresDepartments = (visibilityScope) => visibilityScope === 'department';
+const formatCostLabel = (value) => (Number(value || 0) === 0 ? 'Free' : `₹${value}`);
 
 const AddEvent = () => {
   const [step, setStep] = useState(1);
@@ -34,7 +36,6 @@ const AddEvent = () => {
     visibilityScope: 'department',
     times: [''],
     date: '',
-    tentativeDate: '',
     banner: '',
     images: [''],
     certificate: false,
@@ -146,7 +147,7 @@ const AddEvent = () => {
         toast.error('Committee is required');
         return false;
       }
-      if (form.departmentIds.length === 0) {
+      if (requiresDepartments(form.visibilityScope) && form.departmentIds.length === 0) {
         toast.error('Select at least one department');
         return false;
       }
@@ -165,15 +166,11 @@ const AddEvent = () => {
         toast.error('Event date is required');
         return false;
       }
-      if (!form.tentativeDate) {
-        toast.error('Tentative date is required');
-        return false;
-      }
       if (form.times.some((time) => !time)) {
         toast.error('All event timings must be filled');
         return false;
       }
-      if (!form.cost || isNaN(form.cost) || Number(form.cost) < 0) {
+      if (form.cost === '' || isNaN(form.cost) || Number(form.cost) < 0) {
         toast.error('Valid ticket cost is required');
         return false;
       }
@@ -259,7 +256,6 @@ const AddEvent = () => {
       eventType: form.type,
       committeeId: form.committeeId,
       departmentIds: form.departmentIds,
-      tentativeDate: new Date(`${form.tentativeDate}T09:00:00`).toISOString(),
       visibilityScope: form.visibilityScope,
       banner: form.banner,
       image: images[0],
@@ -287,7 +283,7 @@ const AddEvent = () => {
         <p className="campus-label">Committee Planning</p>
         <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Plan New Event</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/75">
-          Create the event once, scope it to the right audience, and keep it tentative until your final date is confirmed.
+          Create the event once, scope it to the right audience, and the event date will finalize registration automatically.
         </p>
       </div>
       {/* Improved Progress Bar with Step Indicators */}
@@ -372,6 +368,11 @@ const AddEvent = () => {
             </div>
             <div>
               <label className="block mb-2 font-semibold text-xl">Audience Departments</label>
+              <p className="mb-3 text-sm text-blue-200/70">
+                {requiresDepartments(form.visibilityScope)
+                  ? 'Choose the departments allowed to discover this event.'
+                  : 'Optional for broader scopes. You can leave this empty for college-wide or global events.'}
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {bootstrap.departments.map((department) => (
                   <label key={department._id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
@@ -445,10 +446,8 @@ const AddEvent = () => {
           <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <label className="block mb-1 font-semibold text-xl">Event Date</label>
             <Input type="date" className="h-10 border-white/30" name="date" value={form.date} onChange={handleChange} required />
-            <label className="block mb-1 font-semibold text-xl">Tentative Planning Date</label>
-            <Input type="date" className="h-10 border-white/30" name="tentativeDate" value={form.tentativeDate} onChange={handleChange} required />
             <p className="text-sm leading-6 text-blue-100/70">
-              Students can see tentative events, but registration remains closed until you finalize the event later.
+              Once you set the event date, the event is treated as finalized and registration opens automatically.
             </p>
             <label className="block mb-1 font-semibold text-xl">Event Timings</label>
             {form.times.map((time, idx) => (
@@ -571,7 +570,10 @@ const AddEvent = () => {
               <Input name="capacity" className="h-10 border-white/30" value={form.capacity} onChange={handleChange} type="number" min="1" max="5000" placeholder="Total Tickets Available" required />
             )}
             <label className="block mb-1 font-semibold text-xl mt-4">Cost of Ticket (₹)</label>
-            <Input className="h-10 border-white/30" placeholder="e.g 500" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <Input className="h-10 border-white/30" placeholder="Enter 0 for a free event" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <p className="text-sm text-blue-200/70">
+              Setting the cost to 0 makes this event free and students can register without payment.
+            </p>
             <label className="block mb-1 font-semibold text-xl mt-4">Max tickets per student</label>
             <Input
               className="h-10 border-white/30"
@@ -624,9 +626,9 @@ const AddEvent = () => {
               <p><span className="font-semibold">Banner:</span> {form.banner}</p>
               <p><span className="font-semibold">Gallery Images:</span> {getTrimmedImages(form.images).join(', ')}</p>
               <p><span className="font-semibold">Timings:</span> {form.times.join(', ')}</p>
-              <p><span className="font-semibold">Tentative Date:</span> {form.tentativeDate}</p>
+              <p><span className="font-semibold">Lifecycle:</span> registration_open</p>
               <p><span className="font-semibold">Ticketing:</span> {form.ticketingMode === 'general' ? `General Admission (${form.capacity} tickets)` : form.seatMode === 'rows-cols' ? `${form.rows} rows x ${form.cols} columns` : `${form.seats} seats`}</p>
-              <p><span className="font-semibold">Ticket Cost:</span> ₹{form.cost}</p>
+              <p><span className="font-semibold">Ticket Cost:</span> {formatCostLabel(form.cost)}</p>
               <p><span className="font-semibold">Per-student ticket cap:</span> {form.maxTicketsPerStudent}</p>
               <p><span className="font-semibold">Certificate:</span> {form.certificate ? 'Yes' : 'No'}</p>
               <p><span className="font-semibold">Personalized Website:</span> {form.personalized ? 'Yes' : 'No'}</p>

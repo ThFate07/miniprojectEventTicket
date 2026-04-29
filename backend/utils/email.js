@@ -161,6 +161,15 @@ export const confirmationFormat = (title, booking_time, seats, userid, ticket_qr
 
 export const eventMarketingFormat = (event) => {
   const year = new Date().getFullYear();
+  const primaryEventDate = Array.isArray(event.eventDateTime) ? event.eventDateTime[0] : event.eventDateTime;
+  const formattedEventDate = primaryEventDate
+    ? new Date(primaryEventDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Date to be announced';
   
   return `
 <!DOCTYPE html>
@@ -177,7 +186,7 @@ export const eventMarketingFormat = (event) => {
           <!-- Header Banner -->
           <tr>
             <td>
-              <img src="cid:event-banner" alt="${event.title}" style="width: 100%; max-height: 300px; object-fit: cover;">
+              <img src="${event.banner || ""}" alt="${event.title}" style="width: 100%; max-height: 300px; object-fit: cover;">
             </td>
           </tr>
 
@@ -261,6 +270,58 @@ export const eventMarketingFormat = (event) => {
               <p style="margin: 15px 0 0 0; font-size: 12px; color: #e3f2fd;">
                 &copy; ${year} Book My Event. All rights reserved.
               </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
+export const eventConfirmedInterestFormat = (event) => {
+  const firstSchedule = Array.isArray(event.eventDateTime) && event.eventDateTime.length > 0
+    ? event.eventDateTime[0]
+    : event.finalDate || event.tentativeDate;
+  const eventUrl = `${process.env.FRONTEND_URL || ""}/events/${event._id}`;
+  const year = new Date().getFullYear();
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${event.title} is confirmed</title>
+</head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background-color:#f6f8fa;color:#333;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f8fa;padding:20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color:#0d47a1;color:#ffffff;padding:24px;text-align:center;">
+              <h1 style="margin:0;font-size:26px;">${event.title} is confirmed</h1>
+              <p style="margin:8px 0 0;font-size:14px;">You marked interest, so we saved you the update.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p><strong>Date & Time:</strong> ${firstSchedule ? new Date(firstSchedule).toLocaleString() : "To be announced"}</p>
+              <p><strong>Location:</strong> ${event.location || "Venue to be confirmed"}</p>
+              <p style="line-height:1.6;color:#555;">${event.description || "The organizing team has confirmed this event."}</p>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${eventUrl}" style="background-color:#0d47a1;color:#ffffff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block;">
+                  View Event
+                </a>
+              </div>
+              <p style="font-size:13px;color:#666;">Registration details are now available on Book My Event.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f0f0f0;color:#555;text-align:center;padding:14px;font-size:12px;">
+              &copy; ${year} Book My Event. All rights reserved.
             </td>
           </tr>
         </table>

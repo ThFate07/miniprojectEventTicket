@@ -89,8 +89,8 @@ const buildTicketDocument = ({ booking, event }) => {
     doc.setTextColor(17, 24, 39);
     doc.text('Scan this QR at entry', 40, y);
     y += 12;
-    doc.addImage(booking.ticket_qr, 'PNG', 40, y, 120, 120);
-    y += 140;
+    doc.addImage(booking.ticket_qr, 'PNG', 40, y, 180, 180);
+    y += 200;
   }
 
   doc.setFont('helvetica', 'normal');

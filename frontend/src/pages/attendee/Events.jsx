@@ -4,6 +4,7 @@ import React from 'react'
 import { useState } from 'react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { getEventPrimaryImage } from '@/lib/eventImages';
 import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { formatEventSchedule } from '@/lib/utils';
@@ -11,7 +12,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { userStore } from '@/context/userContext';
 import { canManageEvent, isOrganizerRole } from '@/lib/auth';
 
-function EventCard({ _id, title, date, location, image, description, lifecycleState, isFinalized, visibilityScope, isManaged }) {
+function EventCard({
+  _id,
+  title,
+  date,
+  location = '',
+  image,
+  description = '',
+  lifecycleState,
+  isFinalized,
+  visibilityScope,
+  isManaged,
+  interestedByCurrentUser,
+  interestedCount = 0,
+  interestPending,
+  onMarkInterested,
+}) {
   return (
     <div
       className="event-card-surface min-h-[460px] overflow-hidden flex flex-col items-center relative p-4 transition-transform duration-300 hover:scale-[1.015]"
@@ -52,11 +68,26 @@ function EventCard({ _id, title, date, location, image, description, lifecycleSt
         <p className="text-blue-200/70 mb-4 text-center text-sm px-4">
           {description.length > 70 ? description.slice(0, 70) + '...' : description}
         </p>
-        <Link to={`/events/${_id}`}>
-          <button className="w-full bg-blue-700 hover:bg-blue-800 px-4 py-2 text-white font-medium rounded-lg shadow transition-all">
-            {isFinalized ? 'View & Register' : 'View Plan'}
+        {isFinalized ? (
+          <Link to={`/events/${_id}`} className="mt-auto w-full">
+            <button className="w-full bg-blue-700 hover:bg-blue-800 px-4 py-2 text-white font-medium rounded-lg shadow transition-all">
+              View & Register
+            </button>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={interestedByCurrentUser || interestPending}
+            onClick={() => onMarkInterested?.(_id)}
+            className="mt-auto w-full rounded-lg bg-[#f4d58d] px-4 py-2 font-medium text-slate-950 shadow transition-all hover:bg-[#ffd978] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-blue-100"
+          >
+            {interestPending
+              ? 'Saving...'
+              : interestedByCurrentUser
+                ? 'Interested'
+                : `Interested${interestedCount ? ` (${interestedCount})` : ''}`}
           </button>
-        </Link>
+        )}
       </div>
     </div>
   );
@@ -69,12 +100,13 @@ const Events = () => {
   const [showFilters, setShowFilters] = React.useState(false);
   const categories = ["All", "Upcoming", "Confirmed"];
   const [events , setEvents] = useState([]);
+  const [interestPendingId, setInterestPendingId] = useState(null);
   const user = userStore((state) => state.user);
   const organizer = isOrganizerRole(user?.role);
 
   const fetchEvent = async () => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API}/events/get-events`)
+        const response = await axios.get(`${import.meta.env.VITE_API}/events/get-events`, { withCredentials: true })
         console.log(response.data);
         setEvents(response.data.events)
       } catch (error) {
@@ -85,6 +117,27 @@ const Events = () => {
   useEffect(() => {
     fetchEvent();
   },[])
+
+  const handleMarkInterested = async (eventId) => {
+    try {
+      setInterestPendingId(eventId);
+      const response = await axios.post(
+        `${import.meta.env.VITE_API}/events/get-events/${eventId}/interested`,
+        {},
+        { withCredentials: true }
+      );
+      const updatedEvent = response.data.event;
+      setEvents((currentEvents) =>
+        currentEvents.map((event) => (event._id === eventId ? { ...event, ...updatedEvent } : event))
+      );
+      toast.success(response.data.message || 'You will be notified when this event is confirmed.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to mark interest right now.');
+    } finally {
+      setInterestPendingId(null);
+    }
+  };
+
   // Filter and search logic
   const filteredEvents = events?.filter((event) => {
     const normalizedCategory = event.isFinalized ? "Confirmed" : "Upcoming";
@@ -115,6 +168,10 @@ const Events = () => {
           isFinalized={event.isFinalized}
           visibilityScope={event.visibilityScope}
           isManaged={managed}
+          interestedByCurrentUser={event.interestedByCurrentUser}
+          interestedCount={event.interestedCount}
+          interestPending={interestPendingId === event._id}
+          onMarkInterested={handleMarkInterested}
         />
       ))}
     </div>

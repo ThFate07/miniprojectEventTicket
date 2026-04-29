@@ -7,7 +7,7 @@
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "node --watch server.js",
     "seed:college-demo": "node scripts/seedCollegeDemo.js",
     "db:reset-demo": "node scripts/resetAndSeedDemo.js"
   },
@@ -22,7 +22,6 @@
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "dayjs": "^1.11.13",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
@@ -30,8 +29,6 @@
     "mongoose": "^8.16.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.4",
-    "nodemon": "^3.1.10",
-    "puppeteer": "^24.42.0",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "sentiment": "^5.0.2",

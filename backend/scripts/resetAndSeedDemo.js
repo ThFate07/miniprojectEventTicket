@@ -524,6 +524,87 @@ const seed = async () => {
       totalBookings: 0,
     },
     {
+      title: "Northvale AI Product Bootcamp",
+      description: "A finalized paid hands-on bootcamp for Northvale students covering AI prototyping, demos, and product thinking.",
+      location: "Innovation Studio 2",
+      eventType: "Workshop",
+      banner: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",
+      images: ["https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80"],
+      eventDateTime: [buildDate(9, 10)],
+      seats: { type: "general", value: "140" },
+      seatMap: makeGeneralSeatMap(140),
+      cost: 199,
+      maxTicketsPerStudent: 1,
+      certificate: true,
+      organizer: techFestOrganizer._id,
+      collegeId: northvaleCollege._id,
+      departmentIds: [northvaleCse._id, northvaleEce._id],
+      committeeId: techFestCommittee._id,
+      tentativeDate: buildDate(13, 10),
+      finalDate: buildDate(9, 10),
+      isFinalized: true,
+      visibilityScope: "college",
+      lifecycleState: "registration_open",
+      status: "upcoming",
+      totalRevenue: 0,
+      totalBookings: 0,
+    },
+    {
+      title: "Northvale Open Mic Evening",
+      description: "A finalized free campus evening for music, spoken word, and student performances across Northvale.",
+      location: "Student Activity Courtyard",
+      eventType: "Cultural",
+      banner: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1200&q=80",
+      images: ["https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1200&q=80"],
+      eventDateTime: [buildDate(16, 18)],
+      seats: { type: "general", value: "260" },
+      seatMap: makeGeneralSeatMap(260),
+      cost: 0,
+      maxTicketsPerStudent: 2,
+      certificate: false,
+      organizer: culturalOrganizer._id,
+      collegeId: northvaleCollege._id,
+      departmentIds: [northvaleCse._id, northvaleEce._id, northvaleMgmt._id],
+      committeeId: culturalCommittee._id,
+      tentativeDate: buildDate(19, 18),
+      finalDate: buildDate(16, 18),
+      isFinalized: true,
+      visibilityScope: "college",
+      lifecycleState: "registration_open",
+      status: "upcoming",
+      totalRevenue: 0,
+      totalBookings: 0,
+    },
+    {
+      title: "Northvale Startup Pitch Arena",
+      description: "A finalized paid pitch event with judging, founder feedback, and live audience access for Northvale students.",
+      location: "Seminar Hall A",
+      eventType: "Competition",
+      banner: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=1200&q=80",
+      images: ["https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=1200&q=80"],
+      eventDateTime: [buildDate(21, 14)],
+      seats: { type: "RowColumns", value: "6x12" },
+      seatMap: makeGridSeatMap(6, 12),
+      cost: 349,
+      maxTicketsPerStudent: 2,
+      certificate: true,
+      organizer: techFestOrganizer._id,
+      collegeId: northvaleCollege._id,
+      departmentIds: [northvaleCse._id, northvaleMgmt._id],
+      committeeId: techFestCommittee._id,
+      tentativeDate: buildDate(24, 14),
+      finalDate: buildDate(21, 14),
+      isFinalized: true,
+      visibilityScope: "college",
+      lifecycleState: "registration_open",
+      status: "upcoming",
+      totalRevenue: 0,
+      totalBookings: 0,
+    },
+    {
       title: "Intercollege Music Jam",
       description: "A global paid stage event designed to test cross-college discovery and checkout flows.",
       location: "Riverside Amphitheatre",
@@ -559,6 +640,9 @@ const seed = async () => {
     globalEvent,
     roboticsTentativeEvent,
     commerceConclaveEvent,
+    aiBootcampEvent,
+    openMicEvent,
+    pitchArenaEvent,
     musicJamEvent,
   ] = events;
 
@@ -646,8 +730,17 @@ const seed = async () => {
 
   northvaleCseStudent.eventsAttended = [freeCollegeEvent._id, paidCollegeEvent._id];
   northvaleEceStudent.eventsAttended = [paidCollegeEvent._id];
-  techFestOrganizer.eventsOrganized = [tentativeEvent._id, freeCollegeEvent._id];
-  culturalOrganizer.eventsOrganized = [paidCollegeEvent._id];
+  techFestOrganizer.eventsOrganized = [
+    tentativeEvent._id,
+    freeCollegeEvent._id,
+    aiBootcampEvent._id,
+    pitchArenaEvent._id,
+  ];
+  culturalOrganizer.eventsOrganized = [
+    paidCollegeEvent._id,
+    commerceConclaveEvent._id,
+    openMicEvent._id,
+  ];
   riversideOrganizer.eventsOrganized = [globalEvent._id];
   await Promise.all([
     northvaleCseStudent.save(),
@@ -705,6 +798,9 @@ const seed = async () => {
   console.log("- Confirmed -> Cultural Night 2026");
   console.log("- Confirmed -> National Media Summit");
   console.log("- Confirmed -> Northvale Commerce Conclave");
+  console.log("- Confirmed -> Northvale AI Product Bootcamp");
+  console.log("- Confirmed -> Northvale Open Mic Evening");
+  console.log("- Confirmed -> Northvale Startup Pitch Arena");
   console.log("- Confirmed -> Intercollege Music Jam");
 
   await mongoose.connection.close();

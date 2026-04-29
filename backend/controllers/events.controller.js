@@ -1,8 +1,6 @@
 import QRCode from "qrcode";
-import dayjs from "dayjs";
 import mongoose from "mongoose";
 import crypto from "node:crypto";
-import puppeteer from "puppeteer";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Event } from "../models/events.model.js";
 import { Booking } from "../models/bookings.model.js";
@@ -10,7 +8,7 @@ import { Payment } from "../models/payment.model.js";
 import { SeatLock } from "../models/seatLock.model.js";
 import { User } from "../models/user.model.js";
 import { Committee } from "../models/committee.model.js";
-import { confirmationFormat, mail } from "../utils/email.js";
+import { confirmationFormat, eventConfirmedInterestFormat, mail } from "../utils/email.js";
 import {
   canManageCommittee,
   canManageEvent,
@@ -22,8 +20,9 @@ import {
   userHasTenantAssignment,
 } from "../utils/eventAccess.js";
 
-const QR_SIGNING_VERSION = "v1";
-let ticketBrowserPromise = null;
+const QR_SIGNING_VERSION = "v2";
+const LEGACY_QR_SIGNING_VERSION = "v1";
+const QR_TOKEN_PREFIX = "bme";
 
 const getQrSigningSecret = () => process.env.QR_SIGNING_SECRET || process.env.JWT_SECRET;
 
@@ -37,30 +36,13 @@ const signTicketPayload = (payload) => {
   return crypto.createHmac("sha256", secret).update(JSON.stringify(payload)).digest("hex");
 };
 
-const buildSignedTicketPayload = ({
-  bookingId,
-  eventId,
-  organizerId,
-  userId,
-  seats,
-  bookingDateTime,
-  paymentId,
-}) => {
+const buildSignedTicketPayload = ({ bookingId }) => {
   const payload = {
     v: QR_SIGNING_VERSION,
-    bookingId,
-    eventId,
-    organizerId,
-    userId,
-    seats,
-    bookingDateTime: new Date(bookingDateTime).toISOString(),
-    paymentId,
+    b: bookingId,
   };
 
-  return {
-    ...payload,
-    sig: signTicketPayload(payload),
-  };
+  return `${QR_TOKEN_PREFIX}:${payload.v}:${payload.b}:${signTicketPayload(payload)}`;
 };
 
 const signaturesMatch = (expected, received) => {
@@ -71,17 +53,103 @@ const signaturesMatch = (expected, received) => {
   return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
 };
 
-const parseSignedTicketPayload = (qrData) => {
-  const parsedPayload = typeof qrData === "string" ? JSON.parse(qrData) : qrData;
+const parseTicketPayload = (qrData) => {
+  if (typeof qrData === "string") {
+    const normalizedQrData = qrData.trim();
 
-  if (!parsedPayload || typeof parsedPayload !== "object") {
+    if (!normalizedQrData) {
+      throw new Error("QR data is empty");
+    }
+
+    if (normalizedQrData.startsWith(`${QR_TOKEN_PREFIX}:`)) {
+      const [prefix, version, bookingId, signature, ...extraParts] = normalizedQrData.split(":");
+
+      if (
+        prefix !== QR_TOKEN_PREFIX ||
+        !version ||
+        !bookingId ||
+        !signature ||
+        extraParts.length > 0
+      ) {
+        throw new Error("Ticket QR code could not be decoded");
+      }
+
+      const payload = {
+        v: version,
+        b: bookingId,
+      };
+
+      const expectedSignature = signTicketPayload(payload);
+
+      if (!signaturesMatch(expectedSignature, signature)) {
+        throw new Error("Ticket signature is invalid");
+      }
+
+      return {
+        payload: {
+          v: version,
+          bookingId,
+        },
+        format: "signed_compact",
+      };
+    }
+
+    let parsedPayload;
+
+    try {
+      parsedPayload = JSON.parse(normalizedQrData);
+    } catch (error) {
+      throw new Error("Ticket QR code could not be decoded");
+    }
+
+    if (typeof parsedPayload === "string") {
+      return parseTicketPayload(parsedPayload);
+    }
+
+    if (!parsedPayload || typeof parsedPayload !== "object") {
+      throw new Error("Ticket payload is invalid");
+    }
+
+    const { sig, ...payload } = parsedPayload;
+
+    if (!sig) {
+      return {
+        payload,
+        format: "legacy",
+      };
+    }
+
+    if (typeof sig !== "string") {
+      throw new Error("Ticket signature is invalid");
+    }
+
+    const expectedSignature = signTicketPayload(payload);
+
+    if (!signaturesMatch(expectedSignature, sig)) {
+      throw new Error("Ticket signature is invalid");
+    }
+
+    return {
+      payload,
+      format: "signed_json",
+    };
+  }
+
+  if (!qrData || typeof qrData !== "object") {
     throw new Error("Ticket payload is invalid");
   }
 
-  const { sig, ...payload } = parsedPayload;
+  const { sig, ...payload } = qrData;
 
-  if (!sig || typeof sig !== "string") {
-    throw new Error("Ticket signature is missing");
+  if (!sig) {
+    return {
+      payload,
+      format: "legacy",
+    };
+  }
+
+  if (typeof sig !== "string") {
+    throw new Error("Ticket signature is invalid");
   }
 
   const expectedSignature = signTicketPayload(payload);
@@ -90,7 +158,85 @@ const parseSignedTicketPayload = (qrData) => {
     throw new Error("Ticket signature is invalid");
   }
 
-  return payload;
+  return {
+    payload,
+    format: "signed_json",
+  };
+};
+
+const getSignedTicketQrForBooking = async (bookingId) =>
+  generateTicketQR(
+    buildSignedTicketPayload({
+      bookingId: bookingId.toString(),
+    })
+  );
+
+const buildCheckInBookingSummary = (booking) => ({
+  id: booking._id,
+  attendeeName: booking.user_id?.username || "Unknown",
+  attendeeEmail: booking.user_id?.email || "",
+  eventTitle: booking.event_id?.title || "Event",
+  seats: booking.seats,
+  paymentAmt: booking.paymentAmt,
+  redeemedAt: booking.ticket_redeemedAt,
+});
+
+const findBookingForTicketPayload = async ({ bookingId, eventId, userId, paymentId, seats }) => {
+  if (bookingId && mongoose.isValidObjectId(bookingId)) {
+    const directMatch = await Booking.findById(bookingId)
+      .populate("user_id", "username email")
+      .populate("event_id", "title committeeId collegeId organizer");
+
+    if (directMatch) {
+      return {
+        booking: directMatch,
+        resolution: "booking_id",
+      };
+    }
+  }
+
+  const fallbackQuery = {};
+
+  if (eventId && mongoose.isValidObjectId(eventId)) {
+    fallbackQuery.event_id = eventId;
+  }
+
+  if (userId && mongoose.isValidObjectId(userId)) {
+    fallbackQuery.user_id = userId;
+  }
+
+  if (paymentId) {
+    fallbackQuery.payment_id = paymentId;
+  }
+
+  if (seats) {
+    fallbackQuery.seats = seats;
+  }
+
+  if (Object.keys(fallbackQuery).length === 0) {
+    return {
+      booking: null,
+      resolution: null,
+    };
+  }
+
+  const matchingBookings = await Booking.find(fallbackQuery)
+    .sort({ createdAt: -1 })
+    .limit(2)
+    .populate("user_id", "username email")
+    .populate("event_id", "title committeeId collegeId organizer");
+
+  if (matchingBookings.length !== 1) {
+    return {
+      booking: null,
+      resolution: matchingBookings.length > 1 ? "ambiguous_fallback" : "fallback_not_found",
+    };
+  }
+
+  return {
+    booking: matchingBookings[0],
+    resolution: "fallback_lookup",
+  };
 };
 
 const normalizeEventImages = (images, image) => {
@@ -179,6 +325,38 @@ const buildEventDateTime = (event) => {
 const isRegistrationOpen = (event) =>
   Boolean(event?.isFinalized && (event?.lifecycleState || "") === "registration_open");
 
+const normalizeVisibilityScope = (value) => {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return ["department", "college", "global"].includes(normalized) ? normalized : "department";
+};
+
+const normalizeScopedDepartmentIds = ({ visibilityScope, departmentIds, fallbackDepartmentIds = [] }) => {
+  const normalizedScope = normalizeVisibilityScope(visibilityScope);
+  const sourceDepartmentIds = Array.isArray(departmentIds)
+    ? departmentIds
+    : Array.isArray(fallbackDepartmentIds)
+      ? fallbackDepartmentIds
+      : [];
+
+  const normalizedDepartmentIds = sourceDepartmentIds
+    .map((departmentId) => toObjectIdString(departmentId))
+    .filter(Boolean);
+
+  if (normalizedScope === "global") {
+    return [];
+  }
+
+  if (normalizedScope === "college") {
+    return normalizedDepartmentIds;
+  }
+
+  if (normalizedDepartmentIds.length === 0) {
+    throw new Error("Select at least one department for department-level events.");
+  }
+
+  return normalizedDepartmentIds;
+};
+
 const ensureTenantMember = (req, res) => {
   if (userHasTenantAssignment(req.user)) {
     return true;
@@ -231,13 +409,53 @@ const ensureRegistrationOpenForUser = (req, res, event) => {
   return true;
 };
 
-const sanitizeEventResponse = (event) => ({
-  ...event.toObject(),
-  maxTicketsPerStudent: normalizeTicketLimit(event?.maxTicketsPerStudent, 1),
-  roleScopedStatus: event.lifecycleState || "tentative",
-});
+const sanitizeEventResponse = (event, currentUserId = null) => {
+  const eventObject = event.toObject();
+  const interestedUsers = Array.isArray(eventObject.interestedUsers) ? eventObject.interestedUsers : [];
+  const currentUserIdString = toObjectIdString(currentUserId);
 
-const getManagedEvents = async (user) => {
+  return {
+    ...eventObject,
+    maxTicketsPerStudent: normalizeTicketLimit(event?.maxTicketsPerStudent, 1),
+    roleScopedStatus: event.lifecycleState || "tentative",
+    interestedCount: interestedUsers.length,
+    interestedByCurrentUser: Boolean(
+      currentUserIdString &&
+      interestedUsers.some((userId) => toObjectIdString(userId) === currentUserIdString)
+    ),
+  };
+};
+
+const notifyInterestedUsersForConfirmedEvent = async (event) => {
+  const interestedUsers = Array.isArray(event?.interestedUsers) ? event.interestedUsers : [];
+
+  if (interestedUsers.length === 0) {
+    return;
+  }
+
+  const students = await User.find({ _id: { $in: interestedUsers } }).select("email username fullName");
+  const recipients = students
+    .map((student) => student.email)
+    .filter(Boolean);
+
+  if (recipients.length === 0) {
+    return;
+  }
+
+  const html = eventConfirmedInterestFormat(event);
+
+  await Promise.allSettled(
+    recipients.map((email) =>
+      mail({
+        to: email,
+        subject: `${event.title} is confirmed`,
+        html,
+      })
+    )
+  );
+};
+
+const getManagedEvents = (user) => {
   const normalizedRole = normalizeRole(user?.role);
 
   if (normalizedRole === ROLE_VALUES.PLATFORM_ADMIN) {
@@ -257,8 +475,17 @@ const getManagedEvents = async (user) => {
 
 const normalizeLifecycleUpdate = ({ event, updateData }) => {
   const nextData = { ...updateData };
+  const normalizedEventDateTimes = Array.isArray(nextData.eventDateTime)
+    ? nextData.eventDateTime.filter(Boolean)
+    : [];
+  const primaryEventDate = normalizedEventDateTimes[0] || event.eventDateTime?.[0] || event.finalDate || event.tentativeDate;
 
-  if (!nextData.tentativeDate && event.tentativeDate) {
+  if (primaryEventDate) {
+    nextData.tentativeDate = primaryEventDate;
+    nextData.finalDate = nextData.finalDate || primaryEventDate;
+    nextData.isFinalized = true;
+    nextData.lifecycleState = "registration_open";
+  } else if (!nextData.tentativeDate && event.tentativeDate) {
     nextData.tentativeDate = event.tentativeDate;
   }
 
@@ -315,7 +542,7 @@ const getEvents = asyncHandler(async (req, res) => {
   const visibleEvents = events.filter((event) => isEventVisibleToUser(req.user, event));
 
   return res.status(200).send({
-    events: visibleEvents.map(sanitizeEventResponse),
+    events: visibleEvents.map((event) => sanitizeEventResponse(event, req.user?.id)),
     message: visibleEvents.length ? "Events Found" : "No Events Found",
     success: true,
   });
@@ -346,7 +573,7 @@ const getEventById = asyncHandler(async (req, res) => {
 
   return res.status(200).send({
     event: {
-      ...sanitizeEventResponse(event),
+      ...sanitizeEventResponse(event, req.user?.id),
       ...ticketLimitMeta,
     },
     message: "Event Sent",
@@ -407,7 +634,7 @@ const getEventSeatsAndTimings = asyncHandler(async (req, res) => {
 });
 
 const getMyEvents = asyncHandler(async (req, res) => {
-  const events = await getManagedEvents(req.user);
+  const events = getManagedEvents(req.user);
   const resolvedEvents = await events
     .populate("committeeId", "name")
     .populate("departmentIds", "name code")
@@ -416,7 +643,7 @@ const getMyEvents = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    events: resolvedEvents.map((event) => sanitizeEventResponse(event)),
+    events: resolvedEvents.map((event) => sanitizeEventResponse(event, req.user?.id)),
     message: resolvedEvents.length
       ? "Events you manage fetched successfully"
       : "You have not created any events yet",
@@ -439,8 +666,51 @@ const getMyEventById = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    event: sanitizeEventResponse(event),
+    event: sanitizeEventResponse(event, req.user?.id),
     message: "Event fetched successfully !",
+  });
+});
+
+const markInterestedInEvent = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const normalizedRole = normalizeRole(req.user?.role);
+
+  if (normalizedRole !== ROLE_VALUES.STUDENT) {
+    return res.status(403).json({
+      success: false,
+      message: "Only students can mark interest in events",
+    });
+  }
+
+  const event = await Event.findById(id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: "Event not found",
+    });
+  }
+
+  if (!ensureEventVisibleOrManageable(req, res, event)) {
+    return;
+  }
+
+  if (event.isFinalized) {
+    return res.status(400).json({
+      success: false,
+      message: "This event is already confirmed. You can register from the event page.",
+    });
+  }
+
+  event.interestedUsers = Array.from(
+    new Set([...(event.interestedUsers || []).map((userId) => userId.toString()), req.user.id])
+  );
+  await event.save();
+
+  return res.status(200).json({
+    success: true,
+    event: sanitizeEventResponse(event, req.user?.id),
+    message: "You will be notified when this event is confirmed",
   });
 });
 
@@ -475,9 +745,10 @@ const postEvent = asyncHandler(async (req, res) => {
     special,
     committeeId,
     departmentIds,
-    tentativeDate,
     visibilityScope = "department",
   } = req.body;
+
+  const normalizedVisibilityScope = normalizeVisibilityScope(visibilityScope);
 
   if (
     !title ||
@@ -489,9 +760,7 @@ const postEvent = asyncHandler(async (req, res) => {
     !Array.isArray(eventDateTime) ||
     eventDateTime.length === 0 ||
     !seats ||
-    !committeeId ||
-    !Array.isArray(departmentIds) ||
-    departmentIds.length === 0
+    !committeeId
   ) {
     return res.status(400).json({
       success: false,
@@ -512,6 +781,20 @@ const postEvent = asyncHandler(async (req, res) => {
     return res.status(403).json({
       success: false,
       message: "You cannot create events for this committee",
+    });
+  }
+
+  let scopedDepartmentIds;
+
+  try {
+    scopedDepartmentIds = normalizeScopedDepartmentIds({
+      visibilityScope: normalizedVisibilityScope,
+      departmentIds,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 
@@ -599,12 +882,12 @@ const postEvent = asyncHandler(async (req, res) => {
     organizer: req.user.id,
     committeeId: committee._id,
     collegeId: committee.collegeId,
-    departmentIds,
-    tentativeDate: tentativeDate || eventDateTime[0],
-    finalDate: null,
-    isFinalized: false,
-    visibilityScope,
-    lifecycleState: "tentative",
+    departmentIds: scopedDepartmentIds,
+    tentativeDate: eventDateTime[0],
+    finalDate: eventDateTime[0],
+    isFinalized: true,
+    visibilityScope: normalizedVisibilityScope,
+    lifecycleState: "registration_open",
     status: "upcoming",
   });
 
@@ -629,6 +912,13 @@ const updateMyEvent = asyncHandler(async (req, res) => {
   }
 
   const updateData = { ...req.body };
+  const requestedVisibilityScope = Object.prototype.hasOwnProperty.call(updateData, "visibilityScope")
+    ? updateData.visibilityScope
+    : event.visibilityScope;
+  const normalizedVisibilityScope = normalizeVisibilityScope(requestedVisibilityScope);
+
+  updateData.visibilityScope = normalizedVisibilityScope;
+
   if (Object.prototype.hasOwnProperty.call(updateData, "maxTicketsPerStudent")) {
     try {
       updateData.maxTicketsPerStudent = normalizeTicketLimit(
@@ -680,6 +970,26 @@ const updateMyEvent = asyncHandler(async (req, res) => {
     updateData.image = normalizedImages[0];
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(req.body, "departmentIds") ||
+    Object.prototype.hasOwnProperty.call(req.body, "visibilityScope")
+  ) {
+    try {
+      updateData.departmentIds = normalizeScopedDepartmentIds({
+        visibilityScope: normalizedVisibilityScope,
+        departmentIds: Object.prototype.hasOwnProperty.call(req.body, "departmentIds")
+          ? req.body.departmentIds
+          : event.departmentIds,
+        fallbackDepartmentIds: event.departmentIds,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   let normalizedUpdateData;
 
   try {
@@ -691,6 +1001,8 @@ const updateMyEvent = asyncHandler(async (req, res) => {
     });
   }
 
+  const shouldNotifyInterestedUsers = !event.isFinalized && Boolean(normalizedUpdateData.isFinalized);
+
   const updatedEvent = await Event.findByIdAndUpdate(
     id,
     { $set: normalizedUpdateData },
@@ -699,9 +1011,15 @@ const updateMyEvent = asyncHandler(async (req, res) => {
     .populate("committeeId", "name")
     .populate("departmentIds", "name code");
 
+  if (shouldNotifyInterestedUsers) {
+    notifyInterestedUsersForConfirmedEvent(updatedEvent).catch((emailError) => {
+      console.error("Error notifying interested students:", emailError);
+    });
+  }
+
   return res.status(200).json({
     success: true,
-    event: sanitizeEventResponse(updatedEvent),
+    event: sanitizeEventResponse(updatedEvent, req.user?.id),
     message: "Event Updated Successfully",
   });
 });
@@ -742,7 +1060,7 @@ const deleteMyEvent = asyncHandler(async (req, res) => {
 });
 
 const getBookings = asyncHandler(async (req, res) => {
-  const events = await getManagedEvents(req.user);
+  const events = getManagedEvents(req.user);
   const managedEvents = await events.select("_id");
   const eventIds = managedEvents.map((event) => event._id);
 
@@ -771,6 +1089,17 @@ const getMyBookings = asyncHandler(async (req, res) => {
     "title eventDateTime location image images eventType lifecycleState visibilityScope banner"
   );
 
+  await Promise.all(
+    bookings.map(async (booking) => {
+      const refreshedQr = await getSignedTicketQrForBooking(booking._id);
+
+      if (booking.ticket_qr !== refreshedQr) {
+        booking.ticket_qr = refreshedQr;
+        await booking.save();
+      }
+    })
+  );
+
   return res.status(200).json({
     success: true,
     bookings,
@@ -779,7 +1108,7 @@ const getMyBookings = asyncHandler(async (req, res) => {
 });
 
 const getOrganizerSummary = asyncHandler(async (req, res) => {
-  const events = await getManagedEvents(req.user);
+  const events = getManagedEvents(req.user);
   const managedEvents = await events.select("totalBookings totalRevenue status collegeId");
   const eventIds = managedEvents.map((event) => event._id);
 
@@ -850,436 +1179,13 @@ const checkSeatsAvailability = asyncHandler(async (req, res) => {
 });
 
 const generateTicketQR = async (data) => {
-  const qrContent = JSON.stringify(data);
-  return QRCode.toDataURL(qrContent);
-};
-
-const escapeHtml = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-
-const formatTicketDate = (value) => {
-  if (!value) {
-    return "TBA";
-  }
-
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("DD MMM YYYY") : "TBA";
-};
-
-const formatTicketDateTime = (value) => {
-  if (!value) {
-    return "To be announced";
-  }
-
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("D MMM YYYY, h:mm A") : "To be announced";
-};
-
-const formatTicketCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString("en-IN")}`;
-
-const getTicketBrowser = async () => {
-  if (!ticketBrowserPromise) {
-    ticketBrowserPromise = puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-  }
-
-  return ticketBrowserPromise;
-};
-
-const buildTicketPdfHtml = ({ booking, event }) => {
-  const title = booking.event_title || event?.title || "Event";
-  const primaryDate = getPrimaryDateTime(event?.eventDateTime, booking.booking_dateTime);
-  const showDateTime = formatTicketDateTime(primaryDate);
-  const venue = event?.location || "Venue to be announced";
-  const seats = booking.seats || "Not assigned";
-  const status = String(event?.lifecycleState || booking.event_status || "Confirmed").replaceAll("_", " ").toUpperCase();
-  const eventType = event?.eventType || "Campus Event";
-  const bookingId = booking._id || booking.booking_id || "Unavailable";
-  const attendee = booking.user_id?.fullName || booking.user_id?.username || "Registered attendee";
-  const amountPaid = formatTicketCurrency(booking.paymentAmt);
-  const issueDate = formatTicketDate(booking.booking_dateTime || new Date().toISOString());
-
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          * { box-sizing: border-box; }
-          body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f8f4ec;
-            color: #18181b;
-          }
-          .page {
-            width: 794px;
-            margin: 0 auto;
-            padding: 32px;
-          }
-          .card {
-            background: #ffffff;
-            border: 1px solid #e0d8cd;
-            border-radius: 28px;
-            padding: 24px;
-            margin-top: 24px;
-          }
-          .header {
-            background: #111827;
-            color: #ffffff;
-            border-radius: 30px;
-            padding: 30px;
-          }
-          .header-grid {
-            display: table;
-            width: 100%;
-          }
-          .header-main, .header-side {
-            display: table-cell;
-            vertical-align: top;
-          }
-          .header-main {
-            width: 72%;
-            padding-right: 18px;
-          }
-          .header-side {
-            width: 28%;
-          }
-          .status {
-            display: inline-block;
-            float: right;
-            background: #d66a4a;
-            color: #fff8f0;
-            border-radius: 999px;
-            padding: 12px 18px;
-            font-size: 17px;
-            font-weight: 700;
-          }
-          .type-box {
-            clear: both;
-            margin-top: 22px;
-            background: #f9e5d6;
-            border-radius: 24px;
-            padding: 22px 18px;
-            text-align: center;
-          }
-          .eyebrow {
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-          }
-          .hero-title {
-            margin-top: 18px;
-            font-size: 56px;
-            line-height: 1;
-            font-weight: 800;
-          }
-          .hero-copy {
-            margin-top: 16px;
-            max-width: 430px;
-            font-size: 22px;
-            line-height: 1.35;
-            color: #dde5f0;
-          }
-          .event-title {
-            margin-top: 24px;
-            max-width: 470px;
-            font-size: 34px;
-            line-height: 1.16;
-            font-weight: 800;
-            word-break: break-word;
-          }
-          .section-title {
-            font-size: 18px;
-            font-weight: 800;
-            letter-spacing: 0.03em;
-            color: #d66a4a;
-          }
-          .muted-title {
-            color: #1c875c;
-          }
-          .detail-row {
-            display: table;
-            width: 100%;
-            border-spacing: 0 14px;
-            margin-top: 4px;
-          }
-          .detail-cell {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-          }
-          .detail-cell:first-child { padding-right: 7px; }
-          .detail-cell:last-child { padding-left: 7px; }
-          .info-box {
-            border-radius: 22px;
-            padding: 20px 24px;
-            background: #faf7f1;
-          }
-          .info-box.peach { background: #f9e5d6; }
-          .info-box.blue { background: #e7eefc; }
-          .label {
-            font-size: 15px;
-            font-weight: 700;
-            color: #57534e;
-            letter-spacing: 0.03em;
-          }
-          .value {
-            margin-top: 16px;
-            font-size: 22px;
-            line-height: 1.25;
-            font-weight: 800;
-            word-break: break-word;
-          }
-          .entry-card {
-            background: #e1f4ec;
-            border-radius: 28px;
-            padding: 24px;
-            margin-top: 24px;
-          }
-          .entry-copy {
-            margin-top: 14px;
-            max-width: 620px;
-            font-size: 18px;
-            line-height: 1.4;
-            color: #57534e;
-          }
-          .qr-shell {
-            margin-top: 20px;
-            background: #ffffff;
-            border-radius: 24px;
-            padding: 20px;
-            text-align: center;
-          }
-          .qr-shell img {
-            display: block;
-            width: 180px;
-            height: 180px;
-            margin: 0 auto;
-            object-fit: contain;
-          }
-          .identity-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 12px 0;
-          }
-          .notes {
-            background: #f9e5d6;
-            border-radius: 28px;
-            padding: 24px;
-            margin-top: 24px;
-          }
-          .note {
-            margin-top: 10px;
-            font-size: 18px;
-            line-height: 1.45;
-          }
-          .footer {
-            margin-top: 24px;
-            border-top: 1px solid #e0d8cd;
-            padding-top: 18px;
-            display: table;
-            width: 100%;
-            font-size: 16px;
-            color: #57534e;
-          }
-          .footer div {
-            display: table-cell;
-          }
-          .footer div:last-child {
-            text-align: right;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="page">
-          <div class="header">
-            <div class="header-grid">
-              <div class="header-main">
-                <div class="eyebrow">HOSTMYSHOW PRESENTS</div>
-                <div class="hero-title">Event Pass</div>
-                <div class="hero-copy">A clean pass for smooth check-in, sharing, and day-of-event verification.</div>
-                <div class="event-title">${escapeHtml(title)}</div>
-              </div>
-              <div class="header-side">
-                <div class="status">${escapeHtml(status)}</div>
-                <div class="type-box">
-                  <div class="label" style="color:#d66a4a;">EVENT TYPE</div>
-                  <div class="value" style="color:#d66a4a;">${escapeHtml(eventType)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="section-title">PASS DETAILS</div>
-            <div class="detail-row">
-              <div class="detail-cell">
-                <div class="info-box peach">
-                  <div class="label">DATE</div>
-                  <div class="value" style="color:#d66a4a;">${escapeHtml(formatTicketDate(primaryDate))}</div>
-                </div>
-              </div>
-              <div class="detail-cell">
-                <div class="info-box blue">
-                  <div class="label">ISSUED</div>
-                  <div class="value">${escapeHtml(issueDate)}</div>
-                </div>
-              </div>
-            </div>
-            <div class="info-box" style="margin-top:14px;">
-              <div class="label">DATE & TIME</div>
-              <div class="value">${escapeHtml(showDateTime)}</div>
-            </div>
-            <div class="info-box" style="margin-top:14px;">
-              <div class="label">VENUE</div>
-              <div class="value">${escapeHtml(venue)}</div>
-            </div>
-          </div>
-
-          <div class="entry-card">
-            <div class="section-title muted-title">ENTRY SUMMARY</div>
-            <div class="entry-copy">Present this pass at the gate. The QR code and booking details below are enough for a smooth entry.</div>
-            <div class="qr-shell">
-              ${
-                booking.ticket_qr
-                  ? `<img src="${booking.ticket_qr}" alt="Ticket QR" />`
-                  : `<div style="width:180px;height:180px;margin:0 auto;border:1px solid #e0d8cd;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#57534e;font-weight:700;">QR pending</div>`
-              }
-              <div class="label" style="margin-top:12px;">SCAN AT ENTRY</div>
-            </div>
-            <div class="info-box" style="margin-top:16px;background:#ffffff;">
-              <div class="label">SEAT / PASS</div>
-              <div class="value">${escapeHtml(seats)}</div>
-            </div>
-            <div class="info-box" style="margin-top:14px;background:#ffffff;">
-              <div class="label">AMOUNT PAID</div>
-              <div class="value">${escapeHtml(amountPaid)}</div>
-            </div>
-          </div>
-
-          <div class="card">
-            <table class="identity-table">
-              <tr>
-                <td>
-                  <div class="info-box">
-                    <div class="label">ATTENDEE</div>
-                    <div class="value" style="font-size:20px;">${escapeHtml(attendee)}</div>
-                  </div>
-                </td>
-                <td>
-                  <div class="info-box">
-                    <div class="label">BOOKING ID</div>
-                    <div class="value" style="font-size:20px;">${escapeHtml(bookingId)}</div>
-                  </div>
-                </td>
-                <td>
-                  <div class="info-box">
-                    <div class="label">PLATFORM</div>
-                    <div class="value" style="font-size:20px;">HostMyShow</div>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="notes">
-            <div class="section-title">Before you arrive</div>
-            <div class="note">• Carry this PDF or the in-app ticket for scanning.</div>
-            <div class="note">• Arrive 15 minutes early to avoid queue rush near the venue entrance.</div>
-            <div class="note">• Keep the QR code visible and avoid sharing it publicly after check-in.</div>
-          </div>
-
-          <div class="footer">
-            <div><strong>HostMyShow</strong> &nbsp; Campus events, checked in beautifully.</div>
-            <div>Generated ticket</div>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-};
-
-const renderTicketPdf = async ({ booking, event }) => {
-  const browser = await getTicketBrowser();
-  const page = await browser.newPage();
-
-  try {
-    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-    await page.setContent(buildTicketPdfHtml({ booking, event }), {
-      waitUntil: "networkidle0",
-    });
-
-    return await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: {
-        top: "0",
-        right: "0",
-        bottom: "0",
-        left: "0",
-      },
-    });
-  } finally {
-    await page.close();
-  }
-};
-
-const getTicketFileName = (booking) =>
-  `BookMyEvent_Ticket_${booking?._id || booking?.booking_id || "booking"}.pdf`;
-
-const downloadTicketPdf = asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
-
-  const booking = await Booking.findById(bookingId)
-    .populate("user_id", "username fullName email")
-    .populate(
-      "event_id",
-      "title eventDateTime location eventType lifecycleState banner"
-    );
-
-  if (!booking) {
-    return res.status(404).json({
-      success: false,
-      message: "Booking not found",
-    });
-  }
-
-  const event = await Event.findById(booking.event_id?._id || booking.event_id);
-  if (!event) {
-    return res.status(404).json({
-      success: false,
-      message: "Event not found",
-    });
-  }
-
-  const bookingOwnerId = booking.user_id?._id?.toString() || booking.user_id?.toString();
-  const canAccessTicket =
-    bookingOwnerId === req.user.id || canManageEvent(req.user, event);
-
-  if (!canAccessTicket) {
-    return res.status(403).json({
-      success: false,
-      message: "You are not allowed to access this ticket",
-    });
-  }
-
-  const pdfBuffer = await renderTicketPdf({
-    booking,
-    event: booking.event_id || event,
+  const qrContent = typeof data === "string" ? data : JSON.stringify(data);
+  return QRCode.toDataURL(qrContent, {
+    errorCorrectionLevel: "M",
+    margin: 2,
+    width: 640,
   });
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${getTicketFileName(booking)}"`);
-  return res.status(200).send(pdfBuffer);
-});
+};
 
 const bookTicket = asyncHandler(async (req, res) => {
   const user_id = req.user.id;
@@ -1389,16 +1295,7 @@ const bookTicket = asyncHandler(async (req, res) => {
   await event.save();
 
   const bookingId = new mongoose.Types.ObjectId();
-  const qrCodeData = buildSignedTicketPayload({
-    bookingId: bookingId.toString(),
-    eventId: event_id,
-    organizerId: event.organizer?.toString() || req.user.id,
-    userId: user_id,
-    seats: seatList,
-    bookingDateTime: booking_dateTime,
-    paymentId: normalizedPaymentId,
-  });
-  const qrCode = await generateTicketQR(qrCodeData);
+  const qrCode = await getSignedTicketQrForBooking(bookingId);
 
   const displaySeats =
     event.seats?.type === "general" ? `${seatList.length} General Admission` : seatList.join(",");
@@ -1484,10 +1381,10 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
     });
   }
 
-  let ticketPayload;
+  let parsedTicket;
 
   try {
-    ticketPayload = parseSignedTicketPayload(qrData);
+    parsedTicket = parseTicketPayload(qrData);
   } catch (error) {
     return res.status(400).json({
       success: false,
@@ -1495,14 +1392,30 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
     });
   }
 
-  const booking = await Booking.findById(ticketPayload.bookingId)
-    .populate("user_id", "username email")
-    .populate("event_id", "title committeeId collegeId organizer");
+  const { payload: ticketPayload, format: ticketFormat } = parsedTicket;
+
+  const { booking, resolution } = await findBookingForTicketPayload({
+    bookingId: ticketPayload.bookingId,
+    eventId: ticketPayload.eventId,
+    userId: ticketPayload.userId,
+    paymentId: ticketPayload.paymentId,
+    seats: ticketPayload.seats,
+  });
 
   if (!booking) {
+    if (resolution === "ambiguous_fallback") {
+      return res.status(409).json({
+        success: false,
+        message: "This QR matches multiple bookings. Please open the original ticket and rescan its latest QR code.",
+      });
+    }
+
     return res.status(404).json({
       success: false,
-      message: "Booking not found for this ticket",
+      message:
+        ticketFormat === "legacy"
+          ? "This QR belongs to an older demo ticket that no longer matches a live booking record"
+          : "Booking not found for this ticket",
     });
   }
 
@@ -1516,39 +1429,59 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
 
   const bookingEventId = booking.event_id?._id?.toString() || booking.event_id?.toString();
   const bookingUserId = booking.user_id?._id?.toString() || booking.user_id?.toString();
+  const resolvedBookingId = booking._id?.toString();
 
   if (eventId && bookingEventId !== eventId) {
     return res.status(400).json({
       success: false,
       message: "This ticket belongs to a different event",
+      booking: buildCheckInBookingSummary(booking),
     });
   }
 
-  if (
-    ticketPayload.v !== QR_SIGNING_VERSION ||
-    ticketPayload.eventId !== bookingEventId ||
-    ticketPayload.userId !== bookingUserId ||
-    ticketPayload.paymentId !== booking.payment_id
-  ) {
+  if (ticketPayload.eventId && ticketPayload.eventId !== bookingEventId) {
     return res.status(400).json({
       success: false,
-      message: "Ticket data does not match the stored booking",
+      message: "Ticket event data does not match the stored booking",
+      booking: buildCheckInBookingSummary(booking),
     });
+  }
+
+  if (ticketPayload.userId && ticketPayload.userId !== bookingUserId) {
+    return res.status(400).json({
+      success: false,
+      message: "Ticket attendee data does not match the stored booking",
+      booking: buildCheckInBookingSummary(booking),
+    });
+  }
+
+  if (ticketFormat === "signed_compact") {
+    if (ticketPayload.v !== QR_SIGNING_VERSION || ticketPayload.bookingId !== resolvedBookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Ticket data does not match the stored booking",
+        booking: buildCheckInBookingSummary(booking),
+      });
+    }
+  } else if (ticketFormat === "signed_json") {
+    if (
+      ticketPayload.v !== LEGACY_QR_SIGNING_VERSION ||
+      ticketPayload.bookingId !== resolvedBookingId ||
+      ticketPayload.paymentId !== booking.payment_id
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Ticket data does not match the stored booking",
+        booking: buildCheckInBookingSummary(booking),
+      });
+    }
   }
 
   if (booking.ticket_redeem) {
     return res.status(409).json({
       success: false,
       message: "Ticket has already been redeemed",
-      booking: {
-        id: booking._id,
-        attendeeName: booking.user_id?.username || "Unknown",
-        attendeeEmail: booking.user_id?.email || "",
-        eventTitle: booking.event_id?.title || "Event",
-        seats: booking.seats,
-        paymentAmt: booking.paymentAmt,
-        redeemedAt: booking.ticket_redeemedAt,
-      },
+      booking: buildCheckInBookingSummary(booking),
     });
   }
 
@@ -1558,16 +1491,11 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: "Ticket validated and redeemed successfully",
-    booking: {
-      id: booking._id,
-      attendeeName: booking.user_id?.username || "Unknown",
-      attendeeEmail: booking.user_id?.email || "",
-      eventTitle: booking.event_id?.title || "Event",
-      seats: booking.seats,
-      paymentAmt: booking.paymentAmt,
-      redeemedAt: booking.ticket_redeemedAt,
-    },
+    message:
+      ticketFormat === "legacy"
+        ? "Legacy ticket validated and redeemed successfully"
+        : "Ticket validated and redeemed successfully",
+    booking: buildCheckInBookingSummary(booking),
   });
 });
 
@@ -1830,6 +1758,7 @@ export {
   getEventSeatsAndTimings,
   getMyEvents,
   getMyEventById,
+  markInterestedInEvent,
   updateMyEvent,
   deleteMyEvent,
   getBookings,
@@ -1843,5 +1772,4 @@ export {
   unlockSeat,
   getSeatLocks,
   checkSeatsAvailabilityWithLocks,
-  downloadTicketPdf,
 };

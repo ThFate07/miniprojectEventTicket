@@ -34,7 +34,9 @@ const Reviews = () => {
   const fetchReviews = async (eventId) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${import.meta.env.VITE_API}/review/getreviews/${eventId}`);
+      const res = await axios.get(`${import.meta.env.VITE_API}/review/getreviews/${eventId}`, {
+        withCredentials: true,
+      });
       setReviews({
         positive: res.data.data.positive || [],
         neutral: res.data.data.neutral || [],

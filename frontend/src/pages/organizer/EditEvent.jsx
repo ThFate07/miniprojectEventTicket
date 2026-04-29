@@ -21,6 +21,8 @@ const totalSteps = 4;
 const visibilityOptions = ['department', 'college', 'global'];
 
 const getTrimmedImages = (images) => images.map((image) => image.trim()).filter(Boolean);
+const requiresDepartments = (visibilityScope) => visibilityScope === 'department';
+const formatCostLabel = (value) => (Number(value || 0) === 0 ? 'Free' : `₹${value}`);
 
 const EditEvent = () => {
   const { id } = useParams();
@@ -38,10 +40,6 @@ const EditEvent = () => {
     visibilityScope: 'department',
     times: [''],
     date: '',
-    tentativeDate: '',
-    finalDate: '',
-    isFinalized: false,
-    lifecycleState: 'tentative',
     banner: '',
     images: [''],
     certificate: false,
@@ -76,15 +74,11 @@ const EditEvent = () => {
             visibilityScope: eventData.visibilityScope || 'department',
             times: formattedTimes.length > 0 ? formattedTimes : [''],
             date: eventDate,
-            tentativeDate: eventData.tentativeDate ? new Date(eventData.tentativeDate).toISOString().split('T')[0] : eventDate,
-            finalDate: eventData.finalDate ? new Date(eventData.finalDate).toISOString().split('T')[0] : '',
-            isFinalized: Boolean(eventData.isFinalized),
-            lifecycleState: eventData.lifecycleState || 'tentative',
             banner: eventData.banner,
             images: getEventImages(eventData).length > 0 ? getEventImages(eventData) : [''],
             certificate: eventData.certificate || false,
             personalized: eventData.special === 'personalized',
-            cost: eventData.cost,
+            cost: String(eventData.cost ?? 0),
             maxTicketsPerStudent: String(eventData.maxTicketsPerStudent || 1),
           });
         }
@@ -183,7 +177,7 @@ const EditEvent = () => {
       toast.error('Committee is required');
       return;
     }
-    if (form.departmentIds.length === 0) {
+    if (requiresDepartments(form.visibilityScope) && form.departmentIds.length === 0) {
       toast.error('Select at least one department');
       return;
     }
@@ -193,7 +187,7 @@ const EditEvent = () => {
       toast.error('At least one gallery image link is required');
       return;
     }
-    if (!form.cost || isNaN(form.cost) || Number(form.cost) < 0) {
+    if (form.cost === '' || isNaN(form.cost) || Number(form.cost) < 0) {
       toast.error('Valid ticket cost is required');
       return;
     }
@@ -205,16 +199,8 @@ const EditEvent = () => {
       toast.error('Event date is required');
       return;
     }
-    if (!form.tentativeDate) {
-      toast.error('Tentative date is required');
-      return;
-    }
     if (form.times.some(time => !time)) {
       toast.error('All event timings must be filled');
-      return;
-    }
-    if (form.isFinalized && !form.finalDate) {
-      toast.error('Final date is required before finalizing');
       return;
     }
     
@@ -234,10 +220,6 @@ const EditEvent = () => {
       committeeId: form.committeeId,
       departmentIds: form.departmentIds,
       visibilityScope: form.visibilityScope,
-      tentativeDate: new Date(`${form.tentativeDate}T09:00:00`).toISOString(),
-      finalDate: form.finalDate ? new Date(`${form.finalDate}T09:00:00`).toISOString() : null,
-      isFinalized: form.isFinalized,
-      lifecycleState: form.isFinalized ? 'registration_open' : 'tentative',
       banner: form.banner,
       image: images[0],
       images,
@@ -271,7 +253,7 @@ const EditEvent = () => {
         <p className="campus-label">Committee Planning</p>
         <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Refine Event Plan</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/75">
-          Update visibility, confirm the final date, and move the event from planning mode into active registration when ready.
+          Update the event details at any time. The event date stays as the finalized source of truth for registration.
         </p>
       </div>
       {/* Improved Progress Bar with Step Indicators */}
@@ -356,6 +338,11 @@ const EditEvent = () => {
             </div>
             <div>
               <label className="block mb-2 font-semibold text-xl">Audience Departments</label>
+              <p className="mb-3 text-sm text-blue-200/70">
+                {requiresDepartments(form.visibilityScope)
+                  ? 'Choose the departments allowed to discover this event.'
+                  : 'Optional for broader scopes. You can leave this empty for college-wide or global events.'}
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {bootstrap.departments.map((department) => (
                   <label key={department._id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
@@ -427,22 +414,9 @@ const EditEvent = () => {
           <div className="section-card flex w-full flex-col space-y-4 rounded-2xl px-4 py-6 sm:px-6 lg:px-10">
             <label className="block mb-1 font-semibold text-xl">Event Date</label>
             <Input type="date" className="h-10 border-white/30" name="date" value={form.date} onChange={handleChange} required />
-            <label className="block mb-1 font-semibold text-xl">Tentative Planning Date</label>
-            <Input type="date" className="h-10 border-white/30" name="tentativeDate" value={form.tentativeDate} onChange={handleChange} required />
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="isFinalized"
-                checked={form.isFinalized}
-                onCheckedChange={(val) => setForm((prev) => ({ ...prev, isFinalized: Boolean(val) }))}
-              />
-              <label htmlFor="isFinalized" className="text-lg">Finalize event and open registration</label>
-            </div>
-            {form.isFinalized && (
-              <>
-                <label className="block mb-1 font-semibold text-xl">Final Date</label>
-                <Input type="date" className="h-10 border-white/30" name="finalDate" value={form.finalDate} onChange={handleChange} required />
-              </>
-            )}
+            <p className="text-sm leading-6 text-blue-100/70">
+              Editing the event date updates the finalized schedule directly. You can still change the rest of the event details later.
+            </p>
             <label className="block mb-1 font-semibold text-xl">Event Timings</label>
             {form.times.map((time, idx) => (
               <div key={idx} className="mb-2 flex flex-col gap-2 sm:flex-row">
@@ -476,7 +450,10 @@ const EditEvent = () => {
             {/* --- MODIFICATION END --- */}
 
             <label className="block mb-1 font-semibold text-xl mt-4">Cost of Ticket (₹)</label>
-            <Input className="h-10 border-white/30" placeholder="e.g 500" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <Input className="h-10 border-white/30" placeholder="Enter 0 for a free event" name="cost" value={form.cost} onChange={handleChange} type="number" min="0" required />
+            <p className="text-sm text-blue-200/70">
+              Setting the cost to 0 keeps this event free and bypasses payment during registration.
+            </p>
             <label className="block mb-1 font-semibold text-xl mt-4">Max tickets per student</label>
             <Input
               className="h-10 border-white/30"
@@ -529,16 +506,14 @@ const EditEvent = () => {
               <p><span className="font-semibold">Banner:</span> {form.banner}</p>
               <p><span className="font-semibold">Gallery Images:</span> {getTrimmedImages(form.images).join(', ')}</p>
               <p><span className="font-semibold">Timings:</span> {form.times.join(', ')}</p>
-              <p><span className="font-semibold">Tentative Date:</span> {form.tentativeDate}</p>
-              <p><span className="font-semibold">Final Date:</span> {form.finalDate || 'Not finalized yet'}</p>
-              <p><span className="font-semibold">Lifecycle:</span> {form.isFinalized ? 'registration_open' : 'tentative'}</p>
+              <p><span className="font-semibold">Lifecycle:</span> registration_open</p>
               <p><span className="font-semibold">Per-student ticket cap:</span> {form.maxTicketsPerStudent}</p>
               
               {/* --- MODIFICATION START: Hiding Seating Info --- */}
               {/* <p><span className="font-semibold">Seating:</span> {form.seatMode === 'rows-cols' ? `${form.rows} rows x ${form.cols} columns` : `${form.seats} seats`}</p> */}
               {/* --- MODIFICATION END --- */}
 
-              <p><span className="font-semibold">Ticket Cost:</span> ₹{form.cost}</p>
+              <p><span className="font-semibold">Ticket Cost:</span> {formatCostLabel(form.cost)}</p>
               <p><span className="font-semibold">Certificate:</span> {form.certificate ? 'Yes' : 'No'}</p>
               <p><span className="font-semibold">Personalized Website:</span> {form.personalized ? 'Yes' : 'No'}</p>
             </div>

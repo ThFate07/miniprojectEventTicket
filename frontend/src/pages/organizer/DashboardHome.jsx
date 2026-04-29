@@ -130,6 +130,10 @@ const DashboardHome = () => {
                   <span className="text-blue-200">Revenue:</span>
                   <span className="font-semibold text-white">₹{Number(event.totalRevenue || 0).toLocaleString()}</span>
                 </div>
+                <div className="mb-5 flex items-center justify-between text-sm">
+                  <span className="text-blue-200">Ticket Cost:</span>
+                  <span className="font-semibold text-white">{Number(event.cost || 0) === 0 ? 'Free' : `₹${Number(event.cost || 0).toLocaleString()}`}</span>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <button
                     onClick={() => navigate(`/organizer/show/${event._id}`)}

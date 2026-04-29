@@ -34,6 +34,8 @@ const ListShows = () => {
     }
   };
 
+  const formatCostLabel = (value) => (Number(value || 0) === 0 ? 'Free' : `₹${Number(value || 0)}`);
+
   // View handler
   const handleView = (id) => {
     navigate(`/organizer/show/${id}`); // You can create a ShowDetails page for this route
@@ -104,6 +106,10 @@ const ListShows = () => {
               <div className="flex justify-between items-center text-sm mb-4">
                 <span className="text-blue-200">Revenue:</span>
                 <span className="font-semibold text-white">₹{show.totalRevenue}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mb-4">
+                <span className="text-blue-200">Ticket Cost:</span>
+                <span className="font-semibold text-white">{formatCostLabel(show.cost)}</span>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 <button onClick={() => handleView(show._id)} className="flex items-center justify-center gap-2 rounded-lg border border-blue-600 py-2 font-bold text-blue-400 transition-colors hover:bg-blue-900/20">
