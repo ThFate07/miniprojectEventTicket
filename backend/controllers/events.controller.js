@@ -21,7 +21,6 @@ import {
 } from "../utils/eventAccess.js";
 
 const QR_SIGNING_VERSION = "v2";
-const LEGACY_QR_SIGNING_VERSION = "v1";
 const QR_TOKEN_PREFIX = "bme";
 
 const getQrSigningSecret = () => process.env.QR_SIGNING_SECRET || process.env.JWT_SECRET;
@@ -54,113 +53,45 @@ const signaturesMatch = (expected, received) => {
 };
 
 const parseTicketPayload = (qrData) => {
-  if (typeof qrData === "string") {
-    const normalizedQrData = qrData.trim();
-
-    if (!normalizedQrData) {
-      throw new Error("QR data is empty");
-    }
-
-    if (normalizedQrData.startsWith(`${QR_TOKEN_PREFIX}:`)) {
-      const [prefix, version, bookingId, signature, ...extraParts] = normalizedQrData.split(":");
-
-      if (
-        prefix !== QR_TOKEN_PREFIX ||
-        !version ||
-        !bookingId ||
-        !signature ||
-        extraParts.length > 0
-      ) {
-        throw new Error("Ticket QR code could not be decoded");
-      }
-
-      const payload = {
-        v: version,
-        b: bookingId,
-      };
-
-      const expectedSignature = signTicketPayload(payload);
-
-      if (!signaturesMatch(expectedSignature, signature)) {
-        throw new Error("Ticket signature is invalid");
-      }
-
-      return {
-        payload: {
-          v: version,
-          bookingId,
-        },
-        format: "signed_compact",
-      };
-    }
-
-    let parsedPayload;
-
-    try {
-      parsedPayload = JSON.parse(normalizedQrData);
-    } catch (error) {
-      throw new Error("Ticket QR code could not be decoded");
-    }
-
-    if (typeof parsedPayload === "string") {
-      return parseTicketPayload(parsedPayload);
-    }
-
-    if (!parsedPayload || typeof parsedPayload !== "object") {
-      throw new Error("Ticket payload is invalid");
-    }
-
-    const { sig, ...payload } = parsedPayload;
-
-    if (!sig) {
-      return {
-        payload,
-        format: "legacy",
-      };
-    }
-
-    if (typeof sig !== "string") {
-      throw new Error("Ticket signature is invalid");
-    }
-
-    const expectedSignature = signTicketPayload(payload);
-
-    if (!signaturesMatch(expectedSignature, sig)) {
-      throw new Error("Ticket signature is invalid");
-    }
-
-    return {
-      payload,
-      format: "signed_json",
-    };
-  }
-
-  if (!qrData || typeof qrData !== "object") {
+  if (typeof qrData !== "string") {
     throw new Error("Ticket payload is invalid");
   }
 
-  const { sig, ...payload } = qrData;
+  const normalizedQrData = qrData.trim();
 
-  if (!sig) {
-    return {
-      payload,
-      format: "legacy",
-    };
+  if (!normalizedQrData) {
+    throw new Error("QR data is empty");
   }
 
-  if (typeof sig !== "string") {
-    throw new Error("Ticket signature is invalid");
+  const [prefix, version, bookingId, signature, ...extraParts] = normalizedQrData.split(":");
+
+  if (
+    prefix !== QR_TOKEN_PREFIX ||
+    !version ||
+    !bookingId ||
+    !signature ||
+    extraParts.length > 0
+  ) {
+    throw new Error("This ticket uses an unsupported QR format. Please open the latest ticket and try again.");
   }
+
+  const payload = {
+    v: version,
+    b: bookingId,
+  };
 
   const expectedSignature = signTicketPayload(payload);
 
-  if (!signaturesMatch(expectedSignature, sig)) {
+  if (!signaturesMatch(expectedSignature, signature)) {
     throw new Error("Ticket signature is invalid");
   }
 
   return {
-    payload,
-    format: "signed_json",
+    payload: {
+      v: version,
+      bookingId,
+    },
+    format: "signed_compact",
   };
 };
 
@@ -1403,19 +1334,9 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
   });
 
   if (!booking) {
-    if (resolution === "ambiguous_fallback") {
-      return res.status(409).json({
-        success: false,
-        message: "This QR matches multiple bookings. Please open the original ticket and rescan its latest QR code.",
-      });
-    }
-
     return res.status(404).json({
       success: false,
-      message:
-        ticketFormat === "legacy"
-          ? "This QR belongs to an older demo ticket that no longer matches a live booking record"
-          : "Booking not found for this ticket",
+      message: "Booking not found for this ticket",
     });
   }
 
@@ -1455,26 +1376,12 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
     });
   }
 
-  if (ticketFormat === "signed_compact") {
-    if (ticketPayload.v !== QR_SIGNING_VERSION || ticketPayload.bookingId !== resolvedBookingId) {
-      return res.status(400).json({
-        success: false,
-        message: "Ticket data does not match the stored booking",
-        booking: buildCheckInBookingSummary(booking),
-      });
-    }
-  } else if (ticketFormat === "signed_json") {
-    if (
-      ticketPayload.v !== LEGACY_QR_SIGNING_VERSION ||
-      ticketPayload.bookingId !== resolvedBookingId ||
-      ticketPayload.paymentId !== booking.payment_id
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Ticket data does not match the stored booking",
-        booking: buildCheckInBookingSummary(booking),
-      });
-    }
+  if (ticketPayload.v !== QR_SIGNING_VERSION || ticketPayload.bookingId !== resolvedBookingId) {
+    return res.status(400).json({
+      success: false,
+      message: "Ticket data does not match the stored booking",
+      booking: buildCheckInBookingSummary(booking),
+    });
   }
 
   if (booking.ticket_redeem) {
@@ -1491,10 +1398,7 @@ const validateTicketEntry = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message:
-      ticketFormat === "legacy"
-        ? "Legacy ticket validated and redeemed successfully"
-        : "Ticket validated and redeemed successfully",
+    message: "Ticket validated and redeemed successfully",
     booking: buildCheckInBookingSummary(booking),
   });
 });

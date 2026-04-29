@@ -551,7 +551,7 @@ const ScanEntry = () => {
               Entry Guardrail
             </div>
             <p className="text-sm text-white/85">
-              {lastError || 'Signed and supported legacy tickets can be checked in here. Reused, tampered, wrong-event, or unmatched tickets are rejected with a specific reason.'}
+              {lastError || 'Only current signed tickets can be checked in here. Reused, tampered, wrong-event, outdated-format, or unmatched tickets are rejected with a specific reason.'}
             </p>
           </div>
         </section>
